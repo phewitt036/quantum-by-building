@@ -58,6 +58,7 @@ each machine (`~/projects/` on the Mac, the home folder on x8).
 | 4 | `04_secret_number` | Guess a hidden number with one question instead of one per digit → **Bernstein–Vazirani** (**DONE: built by ChatGPT, reviewed and run on ibm_fez by Claude 2026-11-26, 91.6%**) | Hide a 4–6 bit string in an oracle and recover it in one run | Most common result equals the hidden string (sim: 100%) |
 | 5 | `05_grover_search` | Finding the one prize in a row of identical closed boxes without opening them one by one → **Grover's search** (**DONE on sim and ibm_fez 2026-11-26: 4 boxes 96.3%, 8 boxes 78.5% at 2 rounds; on branch `claude/lesson-05` for ChatGPT review**) | 2–3 qubit Grover for a marked item | Sim: 2 qubits 100%, 3 qubits ≥ 90% (≈94.5% expected). Hardware: marked item is the most common result (expect well under 90%) |
 | 6 | `06_noise` | A recording with static → **noise and error mitigation** (**DONE 2026-11-26 on branch `claude/lesson-06`: Bell pair + 0–160 cancelling CNOTs, four jobs (plain / DD / twirling / both) on ibm_fez, plus lesson 5's search with/without twirling on ibm_kingston and ibm_fez. Twirling kept the Bell link provable (82% vs 65% plain at 160 CNOTs); DD did nothing here; on the search, twirling only helped where readout was poor**) | Rerun lessons 1 and 5 on hardware and compare. Mitigation: SamplerV2 only offers `dynamical_decoupling` and `twirling` options (readout/resilience options belong to EstimatorV2), so start with those. **STOP AND ASK** before switching to Estimator or adding another package | Write-up table: sim vs raw hardware vs with DD/twirling |
+| 7 | `07_linking_many` | A row of dominoes → **GHZ states, entanglement witnesses, phase sweep** (added 2026-11-26 at Patrick's "keep going until the IBM time is used") | Middle-out GHZ up to 40 qubits; Tóth–Gühne witness; hand-picked chains; weak-link diagnostic; parity-oscillation fidelity | Sim: 100% to 28 qubits; noisy sim decreasing. Hardware: 12 qubits proven by witness (fez), **16 proven by phase sweep (marrakesh, 55.2% ± 0.6%)**. On `claude/lesson-07` for review |
 
 Order: 1 → 2 → 3 → 4 → 5 → 6. Each builds on the previous one's words.
 Hardware runs can happen any time after a lesson passes on the simulator. Batch them to
@@ -98,6 +99,7 @@ save Open Plan minutes.
   `optimization_level=2` so the compiler picks the best-calibrated qubits; level 1 put a
   one-qubit job on qubit 0 and it came out much noisier. Before calling a hardware result
   meaningful, transpile against `FakeFez` and check the gates are still there.
+- **Never call a group "linked" from a plain average of straight + sideways for more than 2 qubits.** Use the Tóth–Gühne witness (all-agree + ½·parity − ½) or a parity-oscillation fidelity, and require a 2-standard-error margin (lesson 7).
 - **Give each lesson a `--job <id>` flag** (see lesson 3) that fetches a finished hardware
   job and runs the same `check()` with hardware thresholds, instead of eyeballing counts.
 - **Simulator runs use a fixed seed** (`seed_simulator`) so pasted output and charts match reruns.
