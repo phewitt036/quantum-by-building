@@ -54,7 +54,7 @@ each machine (`~/projects/` on the Mac, the home folder on x8).
 |---|---|---|---|---|
 | 1 | `01_bell_state` | Two magic coins that always match, even turned sideways → **entanglement** | H + CNOT on 2 qubits, measured straight and sideways (H on both before measuring) | Sim: only `00`/`11` in both versions, each 40–60%. Hardware: ≥90% matching. **DONE on sim and on ibm_marrakesh 2026-11-26 (91.7% / 96.4% matching).** |
 | 2 | `02_quantum_dice` | A coin spinning in the air → **superposition, measurement** (**DONE on sim and ibm_marrakesh 2026-11-26; hardware die was slightly loaded**) | 1 qubit H = fair coin; 3 qubits H = an 8-sided die; a d6 by throwing away shots that read 6 or 7 (in Python, after the run) and mapping 0–5 to 1–6 | Each of the 8 outcomes 9–16% over 4000 shots; d6 rolls only 1–6 |
-| 3 | `03_interference` | Noise-cancelling headphones → **interference** | H then H returns to 0; add a Z in between and it returns to 1 | H-H gives `0` 100% on sim; H-Z-H gives `1` 100% |
+| 3 | `03_interference` | Noise-cancelling headphones → **interference** (**DONE on sim and ibm_marrakesh 2026-11-26 after a thrown-out run and a failed one; added a "peek" circuit and a phase dial sweep, and a `--job <id>` flag that checks hardware results automatically. Reuse that pattern in later lessons**) | H then H returns to 0; add a Z in between and it returns to 1 | H-H gives `0` 100% on sim; H-Z-H gives `1` 100% |
 | 4 | `04_secret_number` | Guess a hidden number with one question instead of one per digit → **Bernstein–Vazirani** | Hide a 4–6 bit string in an oracle and recover it in one run | Most common result equals the hidden string (sim: 100%) |
 | 5 | `05_grover_search` | Finding the one prize in a row of identical closed boxes without opening them one by one → **Grover's search** | 2–3 qubit Grover for a marked item | Sim: 2 qubits 100%, 3 qubits ≥ 90% (≈94.5% expected). Hardware: marked item is the most common result (expect well under 90%) |
 | 6 | `06_noise` | A recording with static → **noise and error mitigation** | Rerun lessons 1 and 5 on hardware and compare. Mitigation: SamplerV2 only offers `dynamical_decoupling` and `twirling` options (readout/resilience options belong to EstimatorV2), so start with those. **STOP AND ASK** before switching to Estimator or adding another package | Write-up table: sim vs raw hardware vs with DD/twirling |
@@ -93,6 +93,13 @@ save Open Plan minutes.
   next lesson) so other assistants can follow along. No secrets, CRNs or job IDs there.
 - **Commits use the GitHub noreply email** (set in this repo's local git config). On a new
   clone, set it again before the first commit so a personal email never lands in public history.
+- **Hardware compile rules (learned in lesson 3):** put `qc.barrier()` between gates that
+  the compiler could merge or cancel (H-H, H-P-H), or the chip never runs them. Use
+  `optimization_level=2` so the compiler picks the best-calibrated qubits; level 1 put a
+  one-qubit job on qubit 0 and it came out much noisier. Before calling a hardware result
+  meaningful, transpile against `FakeFez` and check the gates are still there.
+- **Give each lesson a `--job <id>` flag** (see lesson 3) that fetches a finished hardware
+  job and runs the same `check()` with hardware thresholds, instead of eyeballing counts.
 - **Simulator runs use a fixed seed** (`seed_simulator`) so pasted output and charts match reruns.
 
 ## STOP AND ASK
