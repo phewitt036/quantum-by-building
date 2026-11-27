@@ -98,6 +98,12 @@ def theory(n_boxes: int, rounds: int) -> float:
     return math.sin((2 * rounds + 1) * angle) ** 2
 
 
+def strictly_top(counts: dict, bits: str) -> bool:
+    """True only if `bits` came up more often than every other answer (a tie doesn't count)."""
+    mine = counts.get(bits, 0)
+    return all(n < mine for b, n in counts.items() if b != bits)
+
+
 def share(counts: dict, bits: str) -> float:
     return counts.get(bits, 0) / sum(counts.values())
 
@@ -120,10 +126,10 @@ def analyze(all_counts: list[dict], real_hardware: bool, where: str) -> bool:
 
     if real_hardware:
         # Noisy hardware: the search must still clearly work, not match the perfect numbers.
-        ok = (max(four, key=four.get) == PRIZE_4 and top8[2] == PRIZE_8
-              and found8[2] > found8[0] and found8[2] > found8[3])
-        print("  need: prize is the top answer for 4 boxes and for 8 boxes at 2 rounds, and "
-              "2 rounds beats 0 rounds and 3 rounds")
+        ok = (strictly_top(four, PRIZE_4) and strictly_top(eight[2], PRIZE_8)
+              and found8[2] > max(found8[0], found8[1], found8[3]))
+        print("  need: prize is the clear top answer (no ties) for 4 boxes and for 8 boxes at "
+              "2 rounds, and 2 rounds beats 0, 1 and 3 rounds")
     else:
         gaps = [abs(got - theory(8, k)) for got, k in zip(found8, ROUNDS_8)]
         ok = found4 == 1.0 and found8[2] >= 0.90 and max(gaps) <= 0.03
