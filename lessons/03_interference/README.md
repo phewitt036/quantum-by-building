@@ -106,18 +106,25 @@ readout error), so it probably drifted after it was last measured. We can't tell
 from here.
 
 **Try 3, ibm_marrakesh, qubit 5: passed, nearly perfect.** This time the compiler was told
-to pick the qubit with the best measured error rates (`optimization_level=2`).
+to pick the qubit with the best measured error rates (`optimization_level=2`), and every
+circuit in the job was pinned to that same qubit. Two **control** circuits were added (an
+idea from ChatGPT's review): set the qubit straight to 0 or to 1 and read it, with no
+interference involved. They measure how often the machine simply misreads the answer.
 
 IBM's **ibm_marrakesh**, 2026-11-26, 4000 shots each (summary):
 
 ```
-spin-spin    -> 0 came back 99.7% of the time
-spin-Z-spin  -> 1 came back 99.6% of the time
-peek         -> final answer 0 was 50.3% (a coin flip)
-dial:  0° 0.1%   90° 50.0%   180° 99.8%   270° 50.1%   360° 0.1%
-       biggest gap from the perfect curve: 1.1%
+spin-spin    -> 0 came back 99.8% of the time
+spin-Z-spin  -> 1 came back 99.4% of the time
+peek         -> final answer 0 was 48.9% (a coin flip)
+dial:  0° 0.1%   90° 48.4%   180° 99.7%   270° 48.8%   360° 0.1%
+       biggest gap from the perfect curve: 1.7%
+controls: set to 0, read as 1: 0.1%    set to 1, read as 0: 0.4%
 CHECK PASSED
 ```
+
+An earlier run on the same qubit, without the controls, gave 99.7% / 99.6% and a 1.1%
+biggest gap, so the result repeats.
 
 ![Hardware results](hardware_results.png)
 
@@ -131,9 +138,15 @@ What that means:
   and by under 1% on another. Real quantum computers have dozens to hundreds of qubits of
   uneven quality that drift over time, and picking good ones is a big part of getting
   good results.
-- **The small leftover error is probably readout.** The machine occasionally misreads the
-  final answer. Gate errors on a single qubit are tiny by comparison. Errors from gates do
-  pile up in longer programs, but a circuit this short can't show that.
+- **The small leftover error is readout, and the controls prove it.** Spin-spin missed by
+  0.2%, and the "set to 0" control was misread 0.1% of the time. Spin-Z-spin missed by 0.6%,
+  and the "set to 1" control was misread 0.4% of the time. The misses match, so almost all
+  the error is the machine misreading the final answer, not the interference going wrong.
+  (A 1 is misread more often because it can relax to 0 while being read.) Errors from gates
+  do pile up in longer programs, but a circuit this short can't show that.
+- **How close is "close"?** With 4000 shots, a perfect 50% result still wobbles by about
+  ±1.6 percentage points (95% of the time) from chance alone. The 90° and 270° points
+  (48.4%, 48.8%) sit at or inside that range.
 
 ## How we know it works
 
@@ -142,6 +155,8 @@ The script prints `CHECK PASSED` only if:
 - spin-spin gives 0, and spin-Z-spin gives 1, **every time** on the simulator (≥ 90% on hardware),
 - the peek gives a coin flip: 45–55% on the simulator (40–60% on hardware),
 - every dial setting is within 5 percentage points of the perfect curve (10 on hardware).
+
+The two controls are printed for comparison but aren't part of the pass/fail check.
 
 ## Run it on a real quantum computer yourself
 

@@ -76,9 +76,21 @@ def build_dial(degrees: int) -> QuantumCircuit:
     return qc
 
 
+def build_ready(bit: int) -> QuantumCircuit:
+    """Control: set the qubit to 0 or 1 directly and read it. Measures the readout error alone."""
+    qc = QuantumCircuit(1, 1)
+    qc.name = f"ready-{bit}"
+    if bit:
+        qc.x(0)
+    qc.measure(0, 0)
+    return qc
+
+
 def all_circuits() -> list[QuantumCircuit]:
-    return [build_spin_twice(), build_flip_in_middle(), build_peek()] + [
-        build_dial(d) for d in DIAL_DEGREES]
+    # Order matters: analyze() unpacks them in this order.
+    return ([build_spin_twice(), build_flip_in_middle(), build_peek()]
+            + [build_dial(d) for d in DIAL_DEGREES]
+            + [build_ready(0), build_ready(1)])
 
 
 def share(counts: dict, want) -> float:
@@ -93,7 +105,7 @@ def theory_dial(degrees: int) -> float:
 
 
 def analyze(all_counts: list[dict], real_hardware: bool, where: str) -> bool:
-    spin_spin, flip, peek, *dial = all_counts
+    spin_spin, flip, peek, *dial, ready0, ready1 = all_counts
     # A perfect simulator should hit the exact answer every time; real hardware gets some slack.
     need_exact = 0.90 if real_hardware else 1.0
     lo_peek, hi_peek = (0.40, 0.60) if real_hardware else (0.45, 0.55)
@@ -113,6 +125,11 @@ def analyze(all_counts: list[dict], real_hardware: bool, where: str) -> bool:
     for d, got in zip(DIAL_DEGREES, dial_ones):
         print(f"       {d:3d} degrees: {got:6.1%}  vs  {theory_dial(d):6.1%}")
     print(f"     biggest gap from perfect: {max(gaps):.1%} (need <= {max_gap:.0%})")
+    # Controls: how often the machine misreads a qubit we set directly (no interference involved).
+    misread0 = share(ready0, lambda b: b == "1")
+    misread1 = share(ready1, lambda b: b == "0")
+    print(f"  controls     -> set to 0, read as 1: {misread0:.1%};  set to 1, read as 0: {misread1:.1%}")
+    print(f"     (compare: spin-spin missed by {1 - zeros:.1%}, spin-Z-spin missed by {1 - ones:.1%})")
 
     ok = (zeros >= need_exact and ones >= need_exact
           and lo_peek <= peek_zero <= hi_peek and max(gaps) <= max_gap)
@@ -160,8 +177,11 @@ def submit_to_ibm(circuits: list[QuantumCircuit]) -> None:
     # (Level 1 put a one-qubit circuit on qubit 0 by default, and our first real run there
     # came out much noisier.) The barriers still stop it from cancelling gates itself.
     pm = generate_preset_pass_manager(backend=backend, optimization_level=2)
+    qubit = pm.run(circuits[0]).layout.final_index_layout()[0]
+    # Pin every circuit to that same physical qubit, so the controls and the dial are comparable.
+    pm = generate_preset_pass_manager(backend=backend, optimization_level=2, initial_layout=[qubit])
     isa = [pm.run(qc) for qc in circuits]
-    qubit = isa[0].layout.final_index_layout()[0]
+    assert all(c.layout.final_index_layout()[0] == qubit for c in isa), "circuits landed on different qubits"
     job = SamplerV2(mode=backend).run(isa, shots=SHOTS)
     print(f"Submitted {len(circuits)} circuits to {backend.name}, qubit {qubit}. Job ID: {job.job_id()}")
     print(f"When it's done:  python lessons/03_interference/interference.py --job {job.job_id()}")
