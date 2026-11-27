@@ -16,7 +16,7 @@ IBM's open-source quantum SDK. Every lesson:
 | # | Lesson | Quantum idea | Status |
 |---|---|---|---|
 | 1 | [Two magic coins](lessons/01_bell_state/) | Entanglement (Bell state) | ✅ simulator · ✅ hardware (ibm_marrakesh) |
-| 2 | Quantum dice | Superposition and measurement | planned |
+| 2 | [Quantum dice](lessons/02_quantum_dice/) | Superposition and measurement | ✅ simulator · ✅ hardware (ibm_marrakesh) |
 | 3 | Cancelling waves | Interference | planned |
 | 4 | Guess the secret number in one try | Bernstein–Vazirani | planned |
 | 5 | Find the needle | Grover's search | planned |
