@@ -167,13 +167,16 @@ def simulate() -> int:
     return 0 if ok else 1
 
 
-def submit(avoid=()) -> None:
+def submit(avoid=(), sizes=None, backend_name=None) -> None:
     from qiskit.transpiler import generate_preset_pass_manager
     from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
 
-    backend = QiskitRuntimeService().least_busy(operational=True, simulator=False, min_num_qubits=max(SIZES))
-    line = L.best_chain(backend, max(SIZES), avoid=avoid)
-    circs = circuits_for(SIZES)
+    sizes = sizes or SIZES
+    service = QiskitRuntimeService()
+    backend = (service.backend(backend_name) if backend_name else
+               service.least_busy(operational=True, simulator=False, min_num_qubits=max(sizes)))
+    line = L.best_chain(backend, max(sizes), avoid=avoid)
+    circs = circuits_for(sizes)
     isa = []
     for qc in circs:
         n = qc.num_qubits
@@ -185,7 +188,7 @@ def submit(avoid=()) -> None:
     sampler.options.twirling.enable_gates = True
     sampler.options.twirling.enable_measure = True
     job = sampler.run(isa, shots=SHOTS)
-    LAST_JOB.write_text(json.dumps({"backend": backend.name, "line": line, "sizes": SIZES,
+    LAST_JOB.write_text(json.dumps({"backend": backend.name, "line": line, "sizes": sizes,
                                     "job": job.job_id()}))
     print(f"Submitted {len(isa)} circuits to {backend.name} (twirling on), line {line}.")
     print("When done:  python lessons/07_linking_many/parity_sweep.py --job")
@@ -233,9 +236,11 @@ def main() -> int:
     mode.add_argument("--job", action="store_true")
     parser.add_argument("--avoid", type=int, nargs="*", default=[], metavar="QUBIT",
                         help="with --ibm: physical qubits to leave out (e.g. ones weak_link.py flagged)")
+    parser.add_argument("--sizes", type=int, nargs="*", metavar="N", help="with --ibm: group sizes (default 16 20)")
+    parser.add_argument("--backend", help="with --ibm: a specific IBM machine (default: least busy)")
     args = parser.parse_args()
     if args.ibm:
-        submit(args.avoid)
+        submit(args.avoid, args.sizes, args.backend)
         return 0
     if args.job:
         return fetch()
