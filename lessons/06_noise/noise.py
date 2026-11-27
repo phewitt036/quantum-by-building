@@ -172,8 +172,9 @@ def save_chart(series: dict, title: str, path: Path) -> None:
         color, ls, marker = styles.get(name, ("#55a868", "-", "o"))
         ax.plot(x, ys, color=color, linestyle=ls, marker=marker, label=name)
     ax.axhline(0.75, color="#555555", linewidth=1, linestyle="-.",
-               label="above this line = provably still linked (75%)")
-    ax.axhline(0.5, color="#c44e52", linewidth=1, linestyle="--", label="no matching at all (50%)")
+               label="above 75% = provably linked (unlinked qubits can't exceed it)")
+    ax.axhline(0.5, color="#c44e52", linewidth=1, linestyle="--",
+               label="independent coin flips (50%)")
     ax.set_xlabel("extra do-nothing CNOT gates")
     ax.set_ylabel("agreement score")
     ax.set_ylim(0.45, 1.02)
@@ -216,7 +217,7 @@ def simulate() -> int:
 
     ok = (all(math.isclose(s, 1.0) for s in ideal)                       # the pairs really do nothing
           and r["raw"][-1] < r["raw"][0] - 0.05                # noise grows with more gates
-          and r["fixed"][0] >= r["raw"][0])                    # undoing misreads helps
+          and r["fixed"][0] > r["raw"][0])                     # undoing misreads raises it
     print("  need: perfect simulator 100% at every depth; noisy score drops by more than "
           "5 points from 0 to 160 CNOTs; undoing misreads raises the starting score")
     print("CHECK PASSED" if ok else "CHECK FAILED")
@@ -298,7 +299,7 @@ def fetch_jobs() -> int:
     p = results["plain"]
     ok = (p["raw"][0] >= 0.85                      # the magic coins work at the start
           and p["raw"][-1] < p["raw"][0] - 0.05    # and noise visibly grows with more gates
-          and p["fixed"][0] >= p["raw"][0])        # undoing misreads helps
+          and p["fixed"][0] > p["raw"][0])         # undoing misreads raises it
     print("  need: plain score >= 85% with no extra gates, dropping by more than 5 points by "
           "160 extra gates, and undoing misreads raises the starting score")
     print("CHECK PASSED" if ok else "CHECK FAILED")

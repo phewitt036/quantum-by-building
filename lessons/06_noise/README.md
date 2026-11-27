@@ -19,10 +19,11 @@ We measure an **agreement score**: the average of how often the coins match stra
 sideways (lesson 1).
 
 - **100%** is a perfect link.
-- **Above 75%**, the score proves the coins are still quantum-linked. No pair of pre-agreed
+- **Above 75%**, the score proves the coins are still quantum-linked: 75% is the most that
+  unlinked qubits can reach on these two looks. No pair of pre-agreed
   ordinary coins can match that often both ways.
 - **Below 75%**, pre-agreed coins could fake it, so the score no longer proves a link.
-- **50%** means no matching at all, which is what two unrelated coin flips give.
+- **50%** is what two unrelated, independent coin flips give: they match half the time by chance.
 
 **Three ways to fight noise:**
 
@@ -151,10 +152,14 @@ finding the prize among 8 boxes (perfect machine: 12.5%, 78.1%, 94.5%, 33.0% for
 | Plain | 11.7% | 52.8% | 57.1% | 21.0% | 81.3% |
 | Twirled | 13.7% | 60.5% | 65.3% | 25.8% | 88.2% |
 
-Twirling added about 8 points, but part of that is the reading alone. These qubits misread a
-lot (the control was only 81% correct), and superconducting qubits mostly misread 1 as 0.
-Measurement twirling averages that habit out across 0s and 1s, which happens to help the prize
-`101` (two 1s). Adjusting for the readout control, gate twirling itself added only about 4 points.
+With both kinds of twirling on (gates and the final reading), the search did about 8 points
+better. This run can't say how much of that came from each kind: both changed together. The
+readout control also improved (81% to 88%). These qubits misread a lot, and superconducting
+qubits mostly misread 1 as 0. Measurement twirling averages that habit out across 0s and 1s,
+which happens to help the prize `101` (two 1s), so reading probably accounts for part of the
+gain. But one control can't measure it exactly, partly because the compiler may have put the
+control's bits on the qubits in a different order than the search's. Run 2 below splits the
+two kinds properly.
 
 **Run 2: IBM's ibm_fez, qubits 142–144** (four jobs, to split the two kinds of twirling):
 
@@ -172,8 +177,10 @@ within the ±1.2 points that 4000 shots wobble by from chance alone.
 
 What we take from the two runs:
 
-- **Twirling's gain on the search came mostly from fixing bad readout** on kingston's qubits.
-  On fez's qubits, which read correctly 98% of the time, there was nothing for it to fix.
+- **Twirling helped on kingston's poorly reading qubits and made no difference on fez's good
+  ones.** Kingston's readout control improved with twirling too, so better reading was probably
+  part of the gain, but these runs can't say exactly how much. On fez's qubits, which read
+  correctly 98% of the time, there was nothing for it to fix.
 - **Gate twirling helps most when errors can line up.** The cancelling-CNOT test is the worst
   case: 160 copies of the same gate, so a systematic error reinforces itself 160 times. The
   search uses about 40 two-qubit gates mixed with many different single-qubit gates, so
