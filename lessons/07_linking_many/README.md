@@ -20,16 +20,17 @@ qubits we have to be careful how we combine the two looks:
   *entanglement witness*. It gives a **guaranteed minimum**. Above 50% proves the whole
   group is linked as one, but it's cautious, so a real link can fall just short.
 - **Thorough test (`parity_sweep.py`):** turn every qubit by the same small angle, look
-  sideways, and repeat at many angles. A genuinely linked group of 16 makes the sideways count
-  wiggle **exactly 16 times** per full turn. Nothing smaller than the whole group can wiggle
-  that fast, so the size of that fast wiggle measures the whole-group link directly.
+  sideways, and repeat at many angles. A linked group of 16 makes the sideways count wiggle
+  **exactly 16 times** per full turn. Only the whole group's all-0s/all-1s link makes that
+  fast a wiggle. Groups that aren't fully linked can still make a faint one, so we combine
+  its size with the all-agree share. Above 50% proves the whole-group link.
 
 New words:
 
 | Word | Plain meaning |
 |---|---|
 | **GHZ state** | A group of qubits linked so they all agree: all 0s or all 1s. |
-| **Link quality (fidelity)** | How close the real state is to the perfect GHZ state, from 0% to 100%. Above 50% proves the whole group is linked. |
+| **Link quality (fidelity)** | How close the real state is to a perfect GHZ state, from 0% to 100%. Above 50% proves the whole group is linked. (The phase sweep measures closeness to the nearest GHZ state, allowing any phase twist between all-0s and all-1s; the 50% line is the same for all of them.) |
 | **Entanglement witness** | A test that can prove a link exists, but can't by itself prove one doesn't. |
 
 ## The code
@@ -40,21 +41,25 @@ New words:
   at once, so a group of 16 takes about 8 steps instead of 16.
 - `link_score()` is the quick test: **all-agree share + ½ × sideways (even − odd) − ½**.
   This is the *Tóth–Gühne witness*, and it's always at or below the true link quality.
-- **A mistake we caught:** our first draft used the plain average of the two numbers. That
-  looks reasonable, and for two qubits it works, but for bigger groups it is **not** a safe
-  minimum: in the sideways test, other combinations of qubits can leak in and flatter the
-  score. That draft would have claimed 20 linked qubits. With the correct formula, the same
-  data proves 12.
+- **A mistake we caught:** our first draft averaged the all-agree share with the sideways
+  even-minus-odd number. That's the usual fidelity formula *if* the sideways number only
+  measured the whole-group link, but it doesn't: other combinations of qubits leak in and can
+  flatter the score, even for two qubits. On run 4 and the kingston repeat (below) that draft
+  would have claimed 20 linked qubits. With the correct formula, the same data proves 12 and
+  none respectively. (Lesson 6's 75% rule, the average of agree-straight and agree-sideways,
+  was already safe: it turns out to be exactly this witness.)
 - `best_chain()` hand-picks a line of connected qubits with the lowest published error
   rates. `--avoid` leaves out qubits we've measured to be bad.
 - Every score comes with its **chance wobble** (one standard error from the shot count), and
-  we only say "proven" when the score is above 50% by more than two wobbles.
+  we only say "proven" when the score is above 50% by more than two wobbles. The wobble covers
+  shot noise only, not the machine itself changing between runs.
 
 [`weak_link.py`](weak_link.py) tests a hand-picked line piece by piece: every neighbouring
 pair, and every qubit's reading.
 
-[`parity_sweep.py`](parity_sweep.py) is the thorough test. We checked it on a simulated
-noisy 8-qubit state whose true link quality is known exactly (83.4%). It measured 83.0%.
+[`parity_sweep.py`](parity_sweep.py) is the thorough test. Its simulator check includes a
+noisy 8-qubit state whose true link quality can be computed exactly (83.4%). The sweep
+measured 83.1% ± 0.2%.
 
 ## What happened when we ran it
 
@@ -92,8 +97,10 @@ qubit 90 reading test: read 0 correctly only 57.9% of the time (IBM's published 
 ```
 
 **Qubit 90 was the culprit.** It sat in the middle of the line, so every group contained it.
-Its published calibration said it was one of the best readers on the chip. In reality it was
-the worst. Calibration data is a snapshot, and qubits drift.
+It came out 1 about 42% of the time when it should have been 0, far worse than the 0.4%
+readout error listed for it. Whether it was misreading or not resetting properly, the
+published numbers didn't show it. Calibration is a snapshot, and individual qubits can go
+bad between calibrations.
 
 ### 4. Same method, avoiding qubit 90 (ibm_fez)
 
@@ -122,46 +129,58 @@ what the quick test can prove.
 ```
 
 The dots follow the red 16-times wiggle closely. **All 16 qubits were linked as one group**,
-about 8 wobbles above the line. 20 qubits fell short.
+nearly 9 wobbles above the line. 20 qubits fell short.
+
+The sweep's first angle (0°) is exactly the quick test's sideways look, so the same data also
+gives the cautious quick score: **39.9% ± 1.4% for 16 qubits**, nowhere near proving it. On
+identical data, the quick test missed a link the thorough test proved. That suggests fez's
+16-qubit groups in runs 1 and 4 (just under 50% on the quick test) may well have been linked
+too, just not provably that way.
 
 ## What that means
 
-- **Final answer for tonight: 16 qubits proven linked as one group** (ibm_marrakesh, thorough
-  test), and 12 proven by the cautious quick test in every fez run.
+- **Final answer for tonight: 16 qubits proven linked as one group** by the thorough test on
+  ibm_marrakesh. The cautious quick test proved 12 in both fez runs that left out the bad
+  qubit (runs 1 and 4).
 - **The careful maths mattered as much as the hardware.** The tempting simple formula would
-  have claimed 20. The honest one said 12, and the better measurement found 16. On a portfolio
-  piece that's the difference between a claim and a result.
-- **Published calibration can be badly wrong for a single qubit** (qubit 90: 0.4% listed,
-  about 42% real misreads of 0). Testing your own qubits before a big run pays off.
-- **Bigger groups are harder in a predictable way.** Each extra qubit adds one more link that
-  can go wrong, so the score drops roughly steadily with size until it can no longer prove
-  anything.
-- **For scale:** research groups have reported verified GHZ states of 100 and more qubits
-  on the best current hardware, using more careful calibration, better qubit choice and
-  error-detection tricks. 16 on a free account with a few minutes of machine time is a
+  have claimed 20 on two of the runs. The honest cautious test proved 12, and the better
+  measurement, on ibm_marrakesh, proved 16. On a portfolio piece, that's the difference
+  between a claim and a result.
+- **Published calibration can be badly wrong for a single qubit.** Qubit 90: 0.4% readout
+  error listed, about 42% wrong in our test. Testing your own qubits before a big run pays off.
+- **Bigger groups get harder faster.** The score falls more steeply the bigger the group gets:
+  every extra qubit is one more link that can fail, and one more place for the whole group's
+  balance to be spoiled while it waits.
+- **For scale:** in late 2025, IBM researchers reported a 120-qubit GHZ state (link quality
+  about 56%, just over the line), using error detection that threw away roughly three runs in
+  four, plus careful qubit choice (Javadi-Abhari et al., "Big cats", arXiv:2510.09520).
+  16 qubits on a free account, with no error detection and a few minutes of machine time, is a
   respectable first result.
 
 ## How we know it works
 
 - `ghz.py` on the simulators: the perfect simulator must score 100% at every size up to 28
   (the circuit is right), and the noisy copy of ibm_marrakesh must score lower at 12 qubits
-  than at 2 (noise grows with size). On hardware: 2 qubits proven, and the score falls as the
-  group grows.
-- `parity_sweep.py` on the perfect simulator must give 100% (± 3 points) for 16 and 20 qubits.
-  It was also checked against the exact answer for a noisy 8-qubit state (83.0% vs 83.4%).
+  than at 2 (noise grows with size). On hardware: the smallest group tried scores above 50%,
+  and the score falls as the group grows.
+- `parity_sweep.py` on the simulators: the perfect simulator must give 100% (± 3 points) for 16
+  and 20 qubits, and on a noisy 8-qubit state the sweep must land within 3 wobbles of the
+  exact answer (it gave 83.1% ± 0.2% against 83.4%).
 
 ## Run it on a real quantum computer yourself
 
-See [HARDWARE.md](../../HARDWARE.md). Approximate quantum time in brackets:
+See [HARDWARE.md](../../HARDWARE.md). Each `--ibm` run saves its job IDs in a small
+`.last_*.json` file next to the scripts (left out of git), and the next `--ibm` run of the same
+script overwrites it. So **check each run with `--job` before starting the next one.**
+Approximate quantum time in brackets:
 
 ```bash
-python lessons/07_linking_many/ghz.py --ibm                      # run 1 (40 s)
-python lessons/07_linking_many/ghz.py --ibm --chain              # run 2 (40 s)
-python lessons/07_linking_many/weak_link.py --ibm                # run 3 (25 s)
-python lessons/07_linking_many/ghz.py --ibm --chain --avoid 90   # run 4 (40 s)
-python lessons/07_linking_many/parity_sweep.py --ibm             # run 5 (50 s)
+python lessons/07_linking_many/ghz.py --ibm                      # run 1 (40 s), then: ghz.py --job
+python lessons/07_linking_many/ghz.py --ibm --chain              # run 2 (40 s), then: ghz.py --job
+python lessons/07_linking_many/weak_link.py --ibm                # run 3 (25 s), tests run 2's line; then: weak_link.py --job
+python lessons/07_linking_many/ghz.py --ibm --chain --avoid 90   # run 4 (40 s), then: ghz.py --job
+python lessons/07_linking_many/parity_sweep.py --ibm --avoid 90  # run 5 (50 s), then: parity_sweep.py --job
 ```
 
-Then the same commands with `--job` instead of `--ibm` (and without the other flags) to check
-the results. Bad qubits change from day to day, so run `weak_link.py` first and pass whatever it
-flags to `--avoid`. Qubit 90 was only bad on ibm_fez that night.
+Bad qubits change from day to day, so replace `90` with whatever `weak_link.py` flags for
+your run. Qubit 90 was only bad on ibm_fez that night.

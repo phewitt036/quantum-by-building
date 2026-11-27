@@ -44,6 +44,8 @@ def submit() -> None:
     from qiskit.transpiler import generate_preset_pass_manager
     from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
 
+    if not CHAIN_JOB.exists():
+        raise SystemExit("Run ghz.py --ibm --chain first: this tests the line that run used.")
     info = json.loads(CHAIN_JOB.read_text())
     line = info.get("chain")
     if not line:
@@ -64,6 +66,9 @@ def submit() -> None:
 def fetch() -> int:
     from qiskit_ibm_runtime import QiskitRuntimeService
 
+    if not LAST_JOB.exists():
+        print("No saved job. Run with --ibm first.")
+        return 1
     info = json.loads(LAST_JOB.read_text())
     service = QiskitRuntimeService()
     job = service.job(info["job"])

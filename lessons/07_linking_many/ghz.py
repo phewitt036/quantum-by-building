@@ -203,6 +203,8 @@ def best_chain(backend, length: int, beam: int = 300, avoid=()) -> list[int]:
     for _ in range(length - 1):
         grown = [(c + w + cost_q(n), path + [n])
                  for c, path in paths for n, w in edges[path[-1]].items() if n not in path]
+        if not grown:
+            raise SystemExit(f"Couldn't find a connected line of {length} usable qubits.")
         paths = sorted(grown)[:beam]
     return paths[0][1]
 
@@ -270,7 +272,7 @@ def fetch_jobs() -> int:
         results[label] = analyze(counts, sizes, label)
     how = "one hand-picked line of qubits" if info.get("chain") else "qubits picked per size"
     print(f"(on {info['backend']}, {how}, {SHOTS} shots each)")
-    name = ("hardware_chain_repeat_results.png" if info.get("avoid") and "plain" not in info else
+    name = ("hardware_chain_repeat_results.png" if info.get("chain") and "plain" not in info else
             "hardware_chain_avoid_results.png" if info.get("avoid") else
             "hardware_chain_results.png" if info.get("chain") else "hardware_results.png")
     if info.get("avoid"):
@@ -280,7 +282,7 @@ def fetch_jobs() -> int:
 
     best = max(results.values(), key=lambda v: sum(s > 0.5 for s in v))
     ok = best[0] > 0.5 and best[-1] < best[0]  # small groups link; bigger groups are harder
-    print("  need: 2 qubits proven linked, and the score falls as the group grows")
+    print(f"  need: the smallest group ({sizes[0]} qubits) scores above 50%, and the score falls as the group grows")
     print("CHECK PASSED" if ok else "CHECK FAILED")
     return 0 if ok else 1
 

@@ -1,18 +1,20 @@
 """Lesson 7, part 2: measure the real link quality of a big group with a phase sweep.
 
-ghz.py's score is a cautious *minimum*. This measures the actual link quality ("GHZ fidelity")
-of a group of n qubits:
+ghz.py's score is a cautious *minimum*. This measures the actual link quality ("GHZ fidelity",
+to the nearest GHZ state, allowing any phase twist between all-0s and all-1s) of n qubits:
   - straight: how often all n agree (all 0s or all 1s),
   - a "phase sweep": turn every qubit by the same small angle, then look sideways, at many
-    angles. A genuinely n-way linked group makes the even-minus-odd count wiggle exactly n
-    times per full turn of the angle. Nothing smaller than the whole group wiggles that fast,
-    so the size of that fast wiggle measures the whole-group link.
+    angles. A linked group makes the even-minus-odd count wiggle exactly n times per full
+    turn. Only the whole group's all-0s/all-1s link makes that fast a wiggle; groups that
+    aren't fully linked can still make a faint one, so we combine its size with the
+    all-agree share.
 
   link quality = (all-agree share) / 2 + (size of the n-times wiggle) / 2
   Above 50% (by more than 2 chance wobbles) proves all n qubits are linked as one group.
 
     python lessons/07_linking_many/parity_sweep.py            # simulator check
-    python lessons/07_linking_many/parity_sweep.py --ibm      # sizes 16 and 20, about 45 s
+    python lessons/07_linking_many/parity_sweep.py --ibm      # sizes 16 and 20, about 50 s
+    python lessons/07_linking_many/parity_sweep.py --ibm --avoid 90   # leave out bad qubits
     python lessons/07_linking_many/parity_sweep.py --job
 """
 
@@ -122,18 +124,39 @@ def simulate() -> int:
     res = quality([r.get_counts(i) for i in range(len(circs))], SIZES)
     report(res, "the perfect simulator")
     save_chart(res, "the perfect simulator", HERE / "parity_simulator_results.png")
-    ok = all(abs(x["quality"] - 1) < 0.03 for x in res)
-    print("  need: link quality within 3 points of 100% for every size on the perfect simulator")
+    # Second check: a noisy 8-qubit case where the exact answer can be computed directly.
+    from qiskit.quantum_info import DensityMatrix, Statevector, state_fidelity
+    from qiskit_aer.noise import NoiseModel, depolarizing_error
+
+    n = 8
+    nm = NoiseModel()
+    nm.add_all_qubit_quantum_error(depolarizing_error(0.03, 2), ["cx"])
+    noisy = AerSimulator(method="density_matrix", noise_model=nm)
+    small = circuits_for([n])
+    r = noisy.run(small, shots=20000, seed_simulator=SEED).result()
+    est = quality([r.get_counts(i) for i in range(len(small))], [n])[0]
+    bare = L.build_ghz(n, sideways=False).remove_final_measurements(inplace=False)
+    with_save = bare.copy()
+    with_save.save_density_matrix()
+    rho = DensityMatrix(noisy.run(with_save).result().data()["density_matrix"])
+    exact = state_fidelity(rho, Statevector(bare))
+    print(f"  noisy 8-qubit test: sweep estimate {est['quality']:.1%} ± {est['wobble']:.1%}, "
+          f"exact answer {exact:.1%}")
+
+    ok = (all(abs(x["quality"] - 1) < 0.03 for x in res)
+          and abs(est["quality"] - exact) < 3 * est["wobble"] + 0.005)
+    print("  need: link quality within 3 points of 100% for every size on the perfect simulator, "
+          "and the noisy 8-qubit estimate within 3 wobbles of the exact answer")
     print("CHECK PASSED" if ok else "CHECK FAILED")
     return 0 if ok else 1
 
 
-def submit() -> None:
+def submit(avoid=()) -> None:
     from qiskit.transpiler import generate_preset_pass_manager
     from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
 
     backend = QiskitRuntimeService().least_busy(operational=True, simulator=False, min_num_qubits=max(SIZES))
-    line = L.best_chain(backend, max(SIZES), avoid=[90] if backend.name == "ibm_fez" else [])
+    line = L.best_chain(backend, max(SIZES), avoid=avoid)
     circs = circuits_for(SIZES)
     isa = []
     for qc in circs:
@@ -146,7 +169,8 @@ def submit() -> None:
     sampler.options.twirling.enable_gates = True
     sampler.options.twirling.enable_measure = True
     job = sampler.run(isa, shots=SHOTS)
-    LAST_JOB.write_text(json.dumps({"backend": backend.name, "line": line, "job": job.job_id()}))
+    LAST_JOB.write_text(json.dumps({"backend": backend.name, "line": line, "sizes": SIZES,
+                                    "job": job.job_id()}))
     print(f"Submitted {len(isa)} circuits to {backend.name} (twirling on), line {line}.")
     print("When done:  python lessons/07_linking_many/parity_sweep.py --job")
 
@@ -162,8 +186,16 @@ def fetch() -> int:
     if job.status() != "DONE":
         print(f"Job is {job.status()}. Try again later.")
         return 0
-    res = quality([r.data.c.get_counts() for r in job.result()], SIZES)
+    sizes = info.get("sizes", SIZES)
+    counts = [r.data.c.get_counts() for r in job.result()]
+    res = quality(counts, sizes)
     report(res, info["backend"])
+    # For comparison: ghz.py's cautious quick score from the same data (angle 0 = plain sideways).
+    for r in res:
+        a, e0 = r["agree"], r["parities"][0]
+        shots = sum(counts[0].values())
+        q, w = a + e0 / 2 - 0.5, math.sqrt((a * (1 - a) + (1 - e0 * e0) / 4) / shots)
+        print(f"   ({r['n']} qubits, same data, cautious quick score: {q:.1%} ± {w:.1%})")
     save_chart(res, info["backend"], HERE / "parity_hardware_results.png")
     return 0
 
@@ -173,9 +205,11 @@ def main() -> int:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--ibm", action="store_true")
     mode.add_argument("--job", action="store_true")
+    parser.add_argument("--avoid", type=int, nargs="*", default=[], metavar="QUBIT",
+                        help="with --ibm: physical qubits to leave out (e.g. ones weak_link.py flagged)")
     args = parser.parse_args()
     if args.ibm:
-        submit()
+        submit(args.avoid)
         return 0
     if args.job:
         return fetch()
