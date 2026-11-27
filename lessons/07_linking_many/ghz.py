@@ -92,7 +92,21 @@ def score_wobble(straight: dict, sideways: dict, n: int) -> float:
     return math.sqrt((a * (1 - a) + (1 - e * e) / 4) / shots)
 
 
-def analyze(counts: list[dict], sizes, label: str) -> list[float]:
+def is_proven(score: float, wobble: float) -> bool:
+    """The one proof rule used everywhere: above 50% by more than 2 chance wobbles."""
+    return score - 2 * wobble > 0.5
+
+
+def measured_qubits(circuit) -> tuple:
+    """Which physical qubit each classical bit was read from, in bit order."""
+    pairs = sorted((circuit.find_bit(i.clbits[0]).index, circuit.find_bit(i.qubits[0]).index)
+                   for i in circuit.data if i.operation.name == "measure")
+    return tuple(q for _, q in pairs)
+
+
+def analyze(counts: list[dict], sizes, label: str, invalid=frozenset()):
+    """Print and return (scores, wobbles). Sizes in `invalid` ran their straight and sideways
+    halves on different qubits, so they can't prove anything and are left out of the proof."""
     out, wob = [], []
     print(f"  {label}:")
     print("     qubits:          " + "".join(f"{n:>7d}" for n in sizes))
@@ -107,11 +121,12 @@ def analyze(counts: list[dict], sizes, label: str) -> list[float]:
     print("     sideways even-odd:" + "".join(f"{v:7.2f}" for v in eo))
     print("     link score:      " + "".join(f"{v:7.1%}" for v in out))
     print("     chance wobble ±: " + "".join(f"{v:7.1%}" for v in wob))
-    # "Proven" = above 50% by more than 2 wobbles, so chance alone would almost never do it.
-    proven = [n for n, s, w in zip(sizes, out, wob) if s - 2 * w > 0.5]
+    if invalid:
+        print(f"     NOT VALID (straight and sideways ran on different qubits): sizes {sorted(invalid)}")
+    proven = [n for n, s, w in zip(sizes, out, wob) if is_proven(s, w) and n not in invalid]
     print(f"     largest group proven linked (score above 50% by more than 2 wobbles): "
-          f"{max(proven) if proven else 'none'} qubits")
-    return out
+          f"{str(max(proven)) + ' qubits' if proven else 'none'}")
+    return out, wob
 
 
 def save_chart(series: dict, title: str, path: Path) -> None:
@@ -122,12 +137,13 @@ def save_chart(series: dict, title: str, path: Path) -> None:
     fig, ax = plt.subplots(figsize=(7, 3.8))
     styles = {"perfect simulator": ("#999999", "--", "none"), "noisy simulator": ("#55a868", "-", "^"),
               "plain": ("#4c72b0", "-", "o"), "twirling on": ("#8172b3", "-", "v")}
-    for name, (sizes, ys) in series.items():
+    for name, (sizes, ys, wobs) in series.items():
         color, ls, marker = styles.get(name, ("#dd8452", "-", "o"))
         ys = [max(y, 0.0) for y in ys]  # below 0 just means "proves nothing"; show as 0
-        ax.plot(sizes, ys, color=color, linestyle=ls, marker=marker, label=name)
+        ax.errorbar(sizes, ys, yerr=[2 * w for w in wobs], color=color, linestyle=ls,
+                    marker=marker, capsize=2, label=name)
     ax.axhline(0.5, color="#c44e52", linewidth=1, linestyle="--",
-               label="above this line = all qubits proven linked")
+               label="proven only if the whole error bar is above this line")
     ax.set_xlabel("number of qubits linked together")
     ax.set_ylabel("link score (guaranteed minimum)")
     ax.set_ylim(-0.05, 1.05)
@@ -163,9 +179,9 @@ def simulate() -> int:
     noisy = [res.get_counts(i) for i in range(len(isa))]
 
     print(f"Simulators, {SHOTS} shots each:")
-    ideal = analyze(perfect, SIZES, "perfect simulator")
-    rough = analyze(noisy, SIM_SIZES, "noisy simulator (copies ibm_marrakesh's published error rates)")
-    save_chart({"perfect simulator": (SIZES, ideal), "noisy simulator": (SIM_SIZES, rough)},
+    ideal, ideal_w = analyze(perfect, SIZES, "perfect simulator")
+    rough, rough_w = analyze(noisy, SIM_SIZES, "noisy simulator (copies ibm_marrakesh's published error rates)")
+    save_chart({"perfect simulator": (SIZES, ideal, ideal_w), "noisy simulator": (SIM_SIZES, rough, rough_w)},
                "Linking many qubits, on the simulators", HERE / "simulator_results.png")
 
     ok = (all(math.isclose(s, 1.0) for s in ideal)  # the circuit is right at every size
@@ -232,7 +248,18 @@ def submit_to_ibm(chain: bool, avoid=(), sizes=None, variants=("plain", "twirl")
     else:
         line = None
         pm = generate_preset_pass_manager(backend=backend, optimization_level=2)
-        isa = [pm.run(qc) for qc in circs]
+        isa = []
+        for straight, sideways in zip(circs[::2], circs[1::2]):
+            # Pin the sideways half to the straight half's qubits: the two halves only make a
+            # valid test together if they measure the same physical qubits.
+            st = pm.run(straight)
+            same = generate_preset_pass_manager(
+                backend=backend, optimization_level=2,
+                initial_layout=st.layout.initial_index_layout(filter_ancillas=True))
+            sw = same.run(sideways)
+            if set(measured_qubits(st)) != set(measured_qubits(sw)):
+                raise SystemExit(f"{straight.name}: straight and sideways landed on different qubits")
+            isa += [st, sw]
     for qc, c in zip(circs[::2], isa[::2]):
         two_q = sum(v for op, v in c.count_ops().items() if op in ("cz", "ecr", "cx"))
         print(f"  {qc.name:16s} {two_q:3d} two-qubit gates, depth {c.depth()}")
@@ -269,7 +296,11 @@ def fetch_jobs() -> int:
             print(f"The {key} job is {status}. Try again later.")
             return 0 if status not in ("ERROR", "CANCELLED") else 1
         counts = [r.data.c.get_counts() for r in job.result()]
-        results[label] = analyze(counts, sizes, label)
+        # Check from the job itself that each straight/sideways pair read the same qubits.
+        ran = [item.circuit for item in job.inputs["quantum_program"].items]
+        invalid = {n for i, n in enumerate(sizes)
+                   if set(measured_qubits(ran[2 * i])) != set(measured_qubits(ran[2 * i + 1]))}
+        results[label] = analyze(counts, sizes, label, invalid) + (invalid,)
     how = "one hand-picked line of qubits" if info.get("chain") else "qubits picked per size"
     print(f"(on {info['backend']}, {how}, {SHOTS} shots each)")
     name = ("hardware_chain_repeat_results.png" if info.get("chain") and "plain" not in info else
@@ -277,12 +308,18 @@ def fetch_jobs() -> int:
             "hardware_chain_results.png" if info.get("chain") else "hardware_results.png")
     if info.get("avoid"):
         how += f", avoiding qubit(s) {info['avoid']}"
-    save_chart({k: (sizes, v) for k, v in results.items()},
+    save_chart({k: (sizes, v[0], v[1]) for k, v in results.items()},
                f"Linking many qubits on {info['backend']} ({how})", HERE / name)
 
-    best = max(results.values(), key=lambda v: sum(s > 0.5 for s in v))
-    ok = best[0] > 0.5 and best[-1] < best[0]  # small groups link; bigger groups are harder
-    print(f"  need: the smallest group ({sizes[0]} qubits) scores above 50%, and the score falls as the group grows")
+    def proven_count(v):
+        scores, wobs, invalid = v
+        return sum(is_proven(s, w) and n not in invalid for n, s, w in zip(sizes, scores, wobs))
+
+    scores, wobs, invalid = max(results.values(), key=proven_count)
+    ok = (is_proven(scores[0], wobs[0]) and sizes[0] not in invalid  # smallest group proven
+          and scores[-1] < scores[0])                                 # bigger groups are harder
+    print(f"  need: the smallest group ({sizes[0]} qubits) proven linked (same rule as above), "
+          "and the score falls as the group grows")
     print("CHECK PASSED" if ok else "CHECK FAILED")
     return 0 if ok else 1
 

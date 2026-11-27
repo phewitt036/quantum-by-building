@@ -10,7 +10,7 @@ to the nearest GHZ state, allowing any phase twist between all-0s and all-1s) of
     all-agree share.
 
   link quality = (all-agree share) / 2 + (size of the n-times wiggle) / 2
-  Above 50% (by more than 2 chance wobbles) proves all n qubits are linked as one group.
+  Proven when its cautious lower bound (see quality()) is above 50%.
 
     python lessons/07_linking_many/parity_sweep.py            # simulator check
     python lessons/07_linking_many/parity_sweep.py --ibm      # sizes 16 and 20, about 50 s
@@ -76,11 +76,17 @@ def quality(counts: list[dict], sizes) -> list[dict]:
         # The n-times wiggle's size: the matching "frequency component" of the sweep.
         wiggle = abs(sum(p * cmath.exp(-1j * n * phi) for p, phi in zip(parities, phis)) / len(phis))
         shots = sum(counts[i - 1].values())
-        # Chance wobble (one standard error) of the quality, from the shot counts.
-        wob = math.sqrt(a * (1 - a) / shots / 4
-                        + sum(1 - p * p for p in parities) / len(parities) / (2 * len(phis) * shots))
+        # A cautious lower bound. The wiggle's size is *fitted* (we pick the best-matching phase),
+        # so noise alone always produces some wiggle and a plain "estimate minus 2 wobbles" rule
+        # is too generous: in simulation it called an unlinked state "proven" about 13% of the
+        # time. Instead: take 2 wobbles off the all-agree share, and take 2 (generous) wobbles
+        # off the wiggle size, using a wobble that ignores how the angles share out the noise.
+        # In simulation this falsely proves an unlinked state at most about 2% of the time.
+        sd_a = math.sqrt(a * (1 - a) / shots)
+        sd_c = math.sqrt(sum((1 - p * p) / shots for p in parities)) / len(phis)
+        lower = (a - 2 * sd_a) / 2 + wiggle - 2 * sd_c
         res.append({"n": n, "agree": a, "wiggle": 2 * wiggle, "quality": a / 2 + wiggle,
-                    "wobble": wob, "parities": parities, "phis": phis})
+                    "lower": lower, "parities": parities, "phis": phis})
     return res
 
 
@@ -88,8 +94,8 @@ def report(res: list[dict], where: str) -> None:
     print(f"Phase sweep on {where}:")
     for r in res:
         print(f"   {r['n']:2d} qubits: all agree {r['agree']:.1%}, n-times wiggle size {r['wiggle']:.2f}"
-              f"  ->  link quality {r['quality']:.1%} ± {r['wobble']:.1%}"
-              f"  ({'proven linked' if r['quality'] - 2 * r['wobble'] > 0.5 else 'not proven'})")
+              f"  ->  link quality {r['quality']:.1%} (cautious lower bound {r['lower']:.1%})"
+              f"  ({'proven linked' if r['lower'] > 0.5 else 'not proven'})")
 
 
 def save_chart(res: list[dict], where: str, path: Path) -> None:
@@ -104,7 +110,9 @@ def save_chart(res: list[dict], where: str, path: Path) -> None:
         comp = sum(p * cmath.exp(-1j * r["n"] * phi) for p, phi in zip(r["parities"], r["phis"])) / len(r["phis"])
         ax.plot(fine, [2 * abs(comp) * math.cos(r["n"] * math.radians(d) + cmath.phase(comp)) for d in fine],
                 color="#c44e52", linewidth=1, label=f"{r['n']}-times wiggle")
-        ax.set_title(f"{r['n']} qubits: link quality {r['quality']:.0%}", fontsize=10)
+        verdict = "proven" if r["lower"] > 0.5 else "not proven"
+        ax.set_title(f"{r['n']} qubits: link quality {r['quality']:.0%} "
+                     f"(lower bound {r['lower']:.0%}, {verdict})", fontsize=9)
         ax.set_xlabel("turn angle (degrees)")
         ax.set_ylabel("sideways even - odd")
         ax.set_ylim(-1.05, 1.05)
@@ -140,13 +148,13 @@ def simulate() -> int:
     with_save.save_density_matrix()
     rho = DensityMatrix(noisy.run(with_save).result().data()["density_matrix"])
     exact = state_fidelity(rho, Statevector(bare))
-    print(f"  noisy 8-qubit test: sweep estimate {est['quality']:.1%} ± {est['wobble']:.1%}, "
+    print(f"  noisy 8-qubit test: sweep estimate {est['quality']:.1%} (lower bound {est['lower']:.1%}), "
           f"exact answer {exact:.1%}")
 
     ok = (all(abs(x["quality"] - 1) < 0.03 for x in res)
-          and abs(est["quality"] - exact) < 3 * est["wobble"] + 0.005)
-    print("  need: link quality within 3 points of 100% for every size on the perfect simulator, "
-          "and the noisy 8-qubit estimate within 3 wobbles of the exact answer")
+          and abs(est["quality"] - exact) < 0.01 and est["lower"] <= exact)
+    print("  need: link quality within 3 points of 100% for every size on the perfect simulator; "
+          "noisy 8-qubit estimate within 1 point of the exact answer, with the lower bound below it")
     print("CHECK PASSED" if ok else "CHECK FAILED")
     return 0 if ok else 1
 
@@ -190,6 +198,14 @@ def fetch() -> int:
     counts = [r.data.c.get_counts() for r in job.result()]
     res = quality(counts, sizes)
     report(res, info["backend"])
+    # Every circuit for one size must have read the same physical qubits, or the parts don't fit.
+    ran = [item.circuit for item in job.inputs["quantum_program"].items]
+    i = 0
+    for n in sizes:
+        block = ran[i:i + 1 + len(angles(n))]
+        i += len(block)
+        same = len({frozenset(L.measured_qubits(c)) for c in block}) == 1
+        print(f"   {n} qubits: all {len(block)} circuits read the same physical qubits: {'yes' if same else 'NO - not valid'}")
     # For comparison: ghz.py's cautious quick score from the same data (angle 0 = plain sideways).
     for r in res:
         a, e0 = r["agree"], r["parities"][0]

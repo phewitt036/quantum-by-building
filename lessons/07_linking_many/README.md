@@ -75,8 +75,16 @@ minimum; "proven" means above 50% by more than 2 chance wobbles.
 
 ![Run 1](hardware_results.png)
 
-**12 qubits proven. 16 just short.** Below zero just means "this test proves nothing". The
-collapse at 20 (and 24 doing better than 20) suggested a bad qubit got pulled in somewhere.
+**12 qubits proven.** Below zero just means "this test proves nothing".
+
+**Caught in ChatGPT's review:** in this run the compiler placed each straight and sideways
+half separately. For 16, 20 and 28 qubits, the two halves landed on **different physical
+qubits**, so those three scores combine measurements of two different groups and mean nothing.
+That's the likely reason for the odd collapse at 20 (and 24 doing better than 20). We checked
+the saved jobs: at 12 qubits both halves read the same qubits, so the 12-qubit proof stands.
+The script now pins each sideways half to its straight half's qubits, and when it reads results
+back it checks the job and marks any mismatched size **NOT VALID**. The chart shows the scores
+as measured; treat 16, 20 and 28 as void.
 
 ### 2. One hand-picked line for every size (ibm_fez)
 
@@ -114,8 +122,8 @@ bad between calibrations.
 Back to the run-1 level: **12 proven, 16 just short**, now with nested groups.
 
 A repeat on **ibm_kingston** (twirling on, sizes 16–24) put 16 qubits at 51.6% ± 1.0%: above
-50%, but not by two wobbles. Three runs on two machines all put 16 qubits right on the edge of
-what the quick test can prove.
+50%, but not by two wobbles, so **nothing was proven** and that run fails its check. Runs 1, 4
+and this repeat all put 16 qubits right on the edge of what the quick test can prove.
 
 ![Repeat on ibm_kingston](hardware_chain_repeat_results.png)
 
@@ -124,12 +132,22 @@ what the quick test can prove.
 ![Phase sweep](parity_hardware_results.png)
 
 ```
-16 qubits: all agree 65.4%, 16-times wiggle size 0.45  ->  link quality 55.2% ± 0.6%  PROVEN
-20 qubits: all agree 52.3%, 20-times wiggle size 0.32  ->  link quality 42.0% ± 0.6%  not proven
+16 qubits: all agree 65.4%, 16-times wiggle size 0.45  ->  link quality 55.2%  (cautious lower bound 53.4%)  PROVEN
+20 qubits: all agree 52.3%, 20-times wiggle size 0.32  ->  link quality 42.0%  (cautious lower bound 40.2%)  not proven
+all circuits for each size read the same physical qubits: yes
 ```
 
-The dots follow the red 16-times wiggle closely. **All 16 qubits were linked as one group**,
-nearly 9 wobbles above the line. 20 qubits fell short.
+The dots follow the red 16-times wiggle closely. **All 16 qubits were linked as one group.**
+20 qubits fell short.
+
+**How sure is "proven"? (fixed after ChatGPT's review)** The wiggle's size is *fitted*: we
+pick whichever phase matches best, so random noise always produces some wiggle. Our first
+rule ("estimate minus 2 wobbles above 50%") didn't allow for that. In 20,000 simulated runs
+of an *unlinked* state sitting exactly on the 50% line, it said "proven" about 13% of the time.
+The script now uses a cautious lower bound: 2 wobbles off the all-agree share, plus 2 generous
+wobbles off the wiggle size. On the same simulated unlinked states, that falsely proves at
+most about 2% of the time, and it still proves our measured 16-qubit point every time.
+On the real data the bound is 53.4%, so **the 16-qubit result survives the stricter test.**
 
 The sweep's first angle (0°) is exactly the quick test's sideways look, so the same data also
 gives the cautious quick score: **39.9% ± 1.4% for 16 qubits**, nowhere near proving it. On
@@ -139,9 +157,9 @@ too, just not provably that way.
 
 ## What that means
 
-- **Final answer for tonight: 16 qubits proven linked as one group** by the thorough test on
-  ibm_marrakesh. The cautious quick test proved 12 in both fez runs that left out the bad
-  qubit (runs 1 and 4).
+- **Final answer: 16 qubits proven linked as one group** by the thorough test on
+  ibm_marrakesh, with a cautious lower bound of 53.4% after the stricter statistics. The
+  cautious quick test proved 12 in both fez runs that left out the bad qubit (runs 1 and 4).
 - **The careful maths mattered as much as the hardware.** The tempting simple formula would
   have claimed 20 on two of the runs. The honest cautious test proved 12, and the better
   measurement, on ibm_marrakesh, proved 16. On a portfolio piece, that's the difference
@@ -159,13 +177,36 @@ too, just not provably that way.
 
 ## How we know it works
 
-- `ghz.py` on the simulators: the perfect simulator must score 100% at every size up to 28
-  (the circuit is right), and the noisy copy of ibm_marrakesh must score lower at 12 qubits
-  than at 2 (noise grows with size). On hardware: the smallest group tried scores above 50%,
-  and the score falls as the group grows.
-- `parity_sweep.py` on the simulators: the perfect simulator must give 100% (± 3 points) for 16
-  and 20 qubits, and on a noisy 8-qubit state the sweep must land within 3 wobbles of the
-  exact answer (it gave 83.1% ± 0.2% against 83.4%).
+`ghz.py` on the simulators, 2026-11-27 (4000 shots each, summary of the script's output):
+
+```
+perfect simulator, 2 to 28 qubits: link score 100.0% at every size
+noisy simulator (copies ibm_marrakesh's published error rates):
+   qubits:       2      4      8     12
+   link score:  97.9%  95.2%  89.0%  83.5%
+CHECK PASSED
+```
+
+It passes only if the perfect simulator scores 100% at every size up to 28 (the circuit is
+right) and the noisy copy scores lower at 12 qubits than at 2 (noise grows with size).
+
+`parity_sweep.py` on the simulators, 2026-11-27 (2000 shots per circuit; 20,000 for the noisy test):
+
+```
+16 qubits: link quality 99.9% (cautious lower bound 99.3%)
+20 qubits: link quality 100.0% (cautious lower bound 99.5%)
+noisy 8-qubit test: sweep estimate 83.1% (lower bound 82.6%), exact answer 83.4%
+CHECK PASSED
+```
+
+It passes only if the perfect simulator gives 100% (± 3 points) for 16 and 20 qubits, and on a
+noisy 8-qubit state, where the exact answer can be computed directly, the estimate lands within
+1 point of it with the lower bound below it.
+
+On hardware, `ghz.py --job` passes only if the smallest group tried is proven linked by the same
+rule used everywhere else (above 50% by more than 2 wobbles, on the same physical qubits), and
+the score falls as the group grows. The chart draws each score with a ±2-wobble error bar; a
+size counts as proven only if its whole bar is above the 50% line.
 
 ## Run it on a real quantum computer yourself
 
