@@ -1,0 +1,17 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Secrets: never commit these. The IBM API key lives in ~/.qiskit/qiskit-ibm.json
+# (outside this repo) or in the QISKIT_IBM_TOKEN environment variable.
+.env
+.env.*
+*.env
+qiskit-ibm.json
+.qiskit/
+
+# Mac / editors
+.DS_Store
+.idea/
+.vscode/

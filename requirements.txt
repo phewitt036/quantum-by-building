@@ -1,0 +1,4 @@
+qiskit>=2.6,<3
+qiskit-aer>=0.18
+qiskit-ibm-runtime>=0.52
+matplotlib>=3.9
