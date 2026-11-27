@@ -15,3 +15,7 @@ qiskit-ibm.json
 .DS_Store
 .idea/
 .vscode/
+
+# Per-lesson record of the last hardware job (job IDs, qubits)
+.last_job.json
+.last_grover_job.json
