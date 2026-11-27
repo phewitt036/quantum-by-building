@@ -1,8 +1,15 @@
 # quantum-by-building
 
 **Seven reproducible Python/Qiskit experiments on simulators and real IBM quantum hardware.
-The strongest result verified entanglement across 16 qubits, on two different IBM machines,
-with cautious lower fidelity bounds of 53.4% and 57.1%** ([lesson 7](lessons/07_linking_many/)).
+The strongest result verified entanglement across 16 qubits, on two different IBM machines:
+cautious lower fidelity bounds of 53.4% and 57.1%, both above the 50% threshold that proves
+it** ([lesson 7](lessons/07_linking_many/)).
+
+*Scope:* a repeat on the first machine's same 16 qubits, the next morning after IBM
+recalibrated it, fell short (46.9%). The 57.1% result came from fresh qubits chosen from that
+day's calibration before the run. The measured counts behind every bound are in
+[`lessons/07_linking_many/data`](lessons/07_linking_many/data/), and
+[`recompute.py`](lessons/07_linking_many/recompute.py) recalculates them without an IBM account.
 
 ![16 qubits linked: phase sweep on ibm_fez](lessons/07_linking_many/parity_fez_results.png)
 

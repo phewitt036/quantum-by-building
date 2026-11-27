@@ -181,15 +181,17 @@ control: all agree 58.8%, wiggle size 0.007  ->  link quality 29.8%, cautious lo
   to 0.007: essentially zero, as it should be.
 - **The repeat did not reproduce run 5.** Same qubits, same settings, but "all agree" fell from
   65.4% to 57.9% and the link quality from 55.2% to 48.7%, just short of the line.
-- **What changed: the machine.** The repeat ran 10.4 hours after run 5, and IBM recalibrated
-  ibm_marrakesh 50 minutes before it. "The same physical qubits" weren't really the same
-  qubits any more. Lessons 3, 6 and 7 all point the same way: today's chips drift, and a
-  great set of qubits yesterday can be an average set today.
+- **The repeat followed a recalibration.** It ran 10.4 hours after run 5, and IBM recalibrated
+  ibm_marrakesh 50 minutes before it. That timing makes drift a likely explanation (lessons 3,
+  6 and 7 all saw qubits change between runs), but this experiment didn't establish the cause.
+  All we know is that the same qubits and settings gave a weaker result the next morning.
 
 ### 7. A fresh try on today's best qubits (ibm_fez, 2026-11-27)
 
-So we re-picked the best line of 16 qubits from that morning's calibration and ran the
-thorough test once more (`parity_sweep.py --ibm --sizes 16`; 35 circuits × 2000 shots, 23 seconds):
+So we ran the thorough test once more on fresh qubits (`parity_sweep.py --ibm --sizes 16`;
+35 circuits × 2000 shots, 23 seconds). The script picked the machine automatically (the least
+busy one, which was ibm_fez) and chose the line of 16 qubits from that morning's published
+calibration data with `best_chain()`, **before the run, without looking at any results**:
 
 ```
 all 35 circuits read the same physical qubits: yes
@@ -201,6 +203,21 @@ all 35 circuits read the same physical qubits: yes
 
 **16 qubits proven again**, on a different machine and a different set of qubits, and by a
 wider margin than the first time.
+
+### Check our numbers yourself
+
+[`data/`](data/) holds what each phase-sweep run measured on real hardware:
+- the machine and physical qubits
+- the straight-measurement totals
+- the even/odd counts after every turn angle
+- whether every circuit read the same qubits
+
+No job IDs or account details. [`recompute.py`](recompute.py) rebuilds every bound above from
+those files, no IBM account needed:
+
+```bash
+python lessons/07_linking_many/recompute.py
+```
 
 ## What that means
 
@@ -270,8 +287,8 @@ python lessons/07_linking_many/ghz.py --ibm --chain              # run 2 (40 s),
 python lessons/07_linking_many/weak_link.py --ibm                # run 3 (25 s), tests run 2's line; then: weak_link.py --job
 python lessons/07_linking_many/ghz.py --ibm --chain --avoid 90   # run 4 (40 s), then: ghz.py --job
 python lessons/07_linking_many/parity_sweep.py --ibm --avoid 90  # run 5 (50 s), then: parity_sweep.py --job
-python lessons/07_linking_many/parity_repeat.py --ibm            # run 6 (45 s), reuses run 5's qubits; then: parity_repeat.py --job
-python lessons/07_linking_many/parity_sweep.py --ibm --sizes 16  # run 7 (25 s), today's best qubits; then: parity_sweep.py --job
+python lessons/07_linking_many/parity_repeat.py --ibm            # run 6 (45 s), run 5's qubits from data/; then: parity_repeat.py --job
+python lessons/07_linking_many/parity_sweep.py --ibm --sizes 16 --backend ibm_fez  # run 7 (25 s), that day's best fez qubits; then: parity_sweep.py --job
 ```
 
 Bad qubits change from day to day, so replace `90` with whatever `weak_link.py` flags for

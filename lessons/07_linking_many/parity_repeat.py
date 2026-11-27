@@ -26,7 +26,10 @@ import parity_sweep as P  # noqa: E402
 N = 16
 SHOTS = 2000  # same as run 5
 SEED = 2026
-ORIGINAL = HERE / ".last_parity_job.json"  # run 5, whose qubits we reuse
+# Run 5's machine and physical qubits, from the published data (not from a local job file,
+# which a later run can overwrite).
+ORIGINAL = HERE / "data" / "run5_sweep_marrakesh.json"
+CONTROL_WIGGLE_MAX = 0.05  # the control's 16-times wiggle must stay below this (simulator and hardware)
 LAST_JOB = HERE / ".last_repeat_job.json"
 
 
@@ -76,8 +79,8 @@ def simulate() -> int:
     circs = circuits()
     r = AerSimulator(method="matrix_product_state").run(circs, shots=SHOTS, seed_simulator=SEED).result()
     rep, ctl = report([r.get_counts(i) for i in range(len(circs))], "the perfect simulator")
-    ok = rep["lower"] > 0.95 and ctl["lower"] < 0.5 and ctl["wiggle"] < 0.05
-    print("  need: repeat proven (lower bound > 95%); control not proven with its wiggle under 0.05")
+    ok = rep["lower"] > 0.95 and ctl["lower"] < 0.5 and ctl["wiggle"] < CONTROL_WIGGLE_MAX
+    print(f"  need: repeat proven (lower bound > 95%); control not proven, with its wiggle under {CONTROL_WIGGLE_MAX}")
     print("CHECK PASSED" if ok else "CHECK FAILED")
     return 0 if ok else 1
 
@@ -86,11 +89,9 @@ def original_layout():
     """Backend and physical qubits (in virtual-qubit order) used for 16 qubits in run 5."""
     from qiskit_ibm_runtime import QiskitRuntimeService
 
-    info = json.loads(ORIGINAL.read_text())
-    service = QiskitRuntimeService()
-    straight16 = service.job(info["job"]).inputs["quantum_program"].items[0].circuit
-    assert straight16.num_clbits == N
-    return service, info["backend"], list(L.measured_qubits(straight16))
+    data = json.loads(ORIGINAL.read_text())
+    group = next(g for g in data["groups"] if g["qubits_n"] == N)
+    return QiskitRuntimeService(), data["backend"], group["physical_qubits"]
 
 
 def submit(dry_run: bool) -> None:
@@ -130,8 +131,10 @@ def fetch() -> int:
     same = len({frozenset(L.measured_qubits(c)) for c in ran}) == 1
     print(f"All {len(ran)} circuits read the same physical qubits: {'yes' if same else 'NO - not valid'}")
     rep, ctl = report([r.data.c.get_counts() for r in job.result()], info["backend"])
-    ok = same and rep["lower"] > 0.5 and ctl["lower"] < 0.5
-    print("  need: same qubits throughout; repeat proven; control not proven")
+    control_ok = ctl["lower"] < 0.5 and ctl["wiggle"] < CONTROL_WIGGLE_MAX
+    print(f"   control behaved (not proven, wiggle under {CONTROL_WIGGLE_MAX}): {'yes' if control_ok else 'NO'}")
+    ok = same and rep["lower"] > 0.5 and control_ok
+    print(f"  need: same qubits throughout; repeat proven; control not proven with its wiggle under {CONTROL_WIGGLE_MAX}")
     print("CHECK PASSED" if ok else "CHECK FAILED")
     return 0 if ok else 1
 
