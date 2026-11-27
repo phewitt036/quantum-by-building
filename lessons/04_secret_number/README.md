@@ -82,6 +82,28 @@ CHECK PASSED
 Each shot asked the oracle once and recovered the whole number. The script repeated the
 experiment 1,000 times to check that every shot gave the same answer.
 
+### On a real quantum computer
+
+IBM's **ibm_fez**, 2026-11-26, 1000 shots (run by Claude after review; about 2 seconds of
+quantum time):
+
+```text
+10110: 916 (91.6%)   10010: 21   10100: 20   11110: 15   00110: 14   ...
+  Hidden number 10110 appeared in 916 of 1000 shots (must beat every other result).
+CHECK PASSED
+```
+
+![ibm_fez returned 10110 in 916 of 1,000 shots](hardware_results.png)
+
+- **One question was enough on real hardware too.** More than 9 shots in 10 read the whole
+  hidden number from a single call to the oracle.
+- **The misses are near-misses.** The next most common answers each differ from `10110` in
+  just one bit (`10010`, `10100`, `11110`, `00110`). That's the fingerprint of small
+  noise flipping one bit here and there, not of the method failing.
+- **Before the run**, a simulator loaded with ibm_marrakesh's published error rates predicted
+  about 97%. The real fez run came in a bit lower. Calibration numbers are a guide, not a
+  promise.
+
 ## How we know it works
 
 The simulator check requires the hidden string in 100% of shots. A completed hardware job

@@ -18,7 +18,7 @@ IBM's open-source quantum SDK. Every lesson:
 | 1 | [Two magic coins](lessons/01_bell_state/) | Entanglement (Bell state) | ✅ simulator · ✅ hardware (ibm_marrakesh) |
 | 2 | [Quantum dice](lessons/02_quantum_dice/) | Superposition and measurement | ✅ simulator · ✅ hardware (ibm_marrakesh) |
 | 3 | [Cancelling waves](lessons/03_interference/) | Interference | ✅ simulator · ✅ hardware (ibm_marrakesh) |
-| 4 | Guess the secret number in one try | Bernstein–Vazirani | planned |
+| 4 | [Guess the secret number in one try](lessons/04_secret_number/) | Bernstein–Vazirani | ✅ simulator · ✅ hardware (ibm_fez) · built by ChatGPT, reviewed by Claude |
 | 5 | Find the needle | Grover's search | planned |
 | 6 | Real machines are noisy | Noise and error mitigation | planned |
 
