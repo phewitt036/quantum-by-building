@@ -160,11 +160,72 @@ identical data, the quick test missed a link the thorough test proved. That sugg
 16-qubit group in run 4 (just under 50% on the quick test) may well have been linked too, just
 not provably that way.
 
+### 6. Can we reproduce it? Same qubits, plus a control (ibm_marrakesh, 2026-11-27)
+
+An idea from ChatGPT's review: repeat run 5 for 16 qubits on the **same machine, the same
+16 physical qubits and the same twirling settings**, and add a **control** to the same job.
+Every circuit also runs a second time with a Z gate on one qubit straight after the linking.
+That flips the sign of the whole-group link, so pooling the shots with and without the Z
+cancels the link exactly: the pooled results come from a plain mix of "all 0s" and "all 1s"
+with no quantum link. The control's 16-times wiggle should vanish, and it must not come out
+proven. ([`parity_repeat.py`](parity_repeat.py); 70 circuits × 2000 shots, 45 seconds of
+quantum time. The repeat reuses the no-Z half of the control's circuits.)
+
+```
+all 70 circuits read the same physical qubits: yes
+repeat:  all agree 57.9%, wiggle size 0.396  ->  link quality 48.7%, cautious lower bound 46.9%  not proven
+control: all agree 58.8%, wiggle size 0.007  ->  link quality 29.8%, cautious lower bound 28.5%  not proven
+```
+
+- **The control worked.** With the link cancelled, the 16-times wiggle dropped from about 0.4
+  to 0.007: essentially zero, as it should be.
+- **The repeat did not reproduce run 5.** Same qubits, same settings, but "all agree" fell from
+  65.4% to 57.9% and the link quality from 55.2% to 48.7%, just short of the line.
+- **The repeat followed a recalibration.** It ran 10.4 hours after run 5, and IBM recalibrated
+  ibm_marrakesh 50 minutes before it. That timing makes drift a likely explanation (lessons 3,
+  6 and 7 all saw qubits change between runs), but this experiment didn't establish the cause.
+  All we know is that the same qubits and settings gave a weaker result the next morning.
+
+### 7. A fresh try on today's best qubits (ibm_fez, 2026-11-27)
+
+So we ran the thorough test once more on fresh qubits (`parity_sweep.py --ibm --sizes 16`;
+35 circuits × 2000 shots, 23 seconds). The script picked the machine automatically (the least
+busy one, which was ibm_fez) and chose the line of 16 qubits from that morning's published
+calibration data with `best_chain()`, **before the run, without looking at any results**:
+
+```
+all 35 circuits read the same physical qubits: yes
+16 qubits: all agree 66.1%, wiggle size 0.52  ->  link quality 58.8%  (cautious lower bound 57.1%)  PROVEN
+(same data, cautious quick score: 42.7% ± 1.4%)
+```
+
+![Phase sweep on ibm_fez](parity_fez_results.png)
+
+**16 qubits proven again**, on a different machine and a different set of qubits, and by a
+wider margin than the first time.
+
+### Check our numbers yourself
+
+[`data/`](data/) holds what each phase-sweep run measured on real hardware:
+- the machine and physical qubits
+- the straight-measurement totals
+- the even/odd counts after every turn angle
+- whether every circuit read the same qubits
+
+No job IDs or account details. [`recompute.py`](recompute.py) rebuilds every bound above from
+those files, no IBM account needed:
+
+```bash
+python lessons/07_linking_many/recompute.py
+```
+
 ## What that means
 
-- **Final answer: 16 qubits proven linked as one group** by the thorough test on
-  ibm_marrakesh, with a cautious lower bound of 53.4% after the stricter statistics. The
-  cautious quick test proved 12 in both fez runs that left out the bad qubit (runs 1 and 4).
+- **Final answer: 16 qubits proven linked as one group, on two different machines.** The
+  thorough test proved it on ibm_marrakesh (cautious lower bound 53.4%) and again the next
+  day on fresh qubits on ibm_fez (57.1%). A repeat on the original marrakesh qubits after an
+  overnight recalibration fell just short (46.9%), and we report that too. The cautious quick
+  test proved 12 in both fez runs that left out the bad qubit (runs 1 and 4).
 - **The careful maths mattered as much as the hardware.** The tempting simple formula would
   have claimed 20 on two of the runs. The honest cautious test proved 12, and the better
   measurement, on ibm_marrakesh, proved 16. On a portfolio piece, that's the difference
@@ -226,6 +287,8 @@ python lessons/07_linking_many/ghz.py --ibm --chain              # run 2 (40 s),
 python lessons/07_linking_many/weak_link.py --ibm                # run 3 (25 s), tests run 2's line; then: weak_link.py --job
 python lessons/07_linking_many/ghz.py --ibm --chain --avoid 90   # run 4 (40 s), then: ghz.py --job
 python lessons/07_linking_many/parity_sweep.py --ibm --avoid 90  # run 5 (50 s), then: parity_sweep.py --job
+python lessons/07_linking_many/parity_repeat.py --ibm            # run 6 (45 s), run 5's qubits from data/; then: parity_repeat.py --job
+python lessons/07_linking_many/parity_sweep.py --ibm --sizes 16 --backend ibm_fez  # run 7 (25 s), that day's best fez qubits; then: parity_sweep.py --job
 ```
 
 Bad qubits change from day to day, so replace `90` with whatever `weak_link.py` flags for
