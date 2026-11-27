@@ -19,3 +19,5 @@ qiskit-ibm.json
 # Per-lesson record of the last hardware job (job IDs, qubits)
 .last_job.json
 .last_grover_job.json
+.last_weak_link_job.json
+.last_parity_job.json

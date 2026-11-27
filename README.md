@@ -21,6 +21,7 @@ IBM's open-source quantum SDK. Every lesson:
 | 4 | [Guess the secret number in one try](lessons/04_secret_number/) | Bernstein–Vazirani | ✅ simulator · ✅ hardware (ibm_fez) · built by ChatGPT, reviewed by Claude |
 | 5 | [Find the prize](lessons/05_grover_search/) | Grover's search | ✅ simulator · ✅ hardware (ibm_fez) |
 | 6 | [Real machines are noisy](lessons/06_noise/) | Noise and error mitigation | ✅ simulator · ✅ hardware (ibm_fez, ibm_kingston) |
+| 7 | [How many qubits can we link?](lessons/07_linking_many/) | GHZ states, entanglement witnesses | ✅ simulator · ✅ hardware: **16 qubits proven linked** (ibm_marrakesh) |
 
 ## Run it
 
