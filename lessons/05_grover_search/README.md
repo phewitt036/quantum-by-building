@@ -21,7 +21,9 @@ It's like pushing a child on a swing: each push at the right moment adds height.
 pushing past the top and you start slowing them down. Grover's search has a best number
 of rounds, and **going past it makes the answer worse**. This lesson shows that too.
 
-For 8 boxes the best is 2 rounds. For a huge number of boxes N it's about 0.8 × √N rounds,
+For 8 boxes the first peak is at 2 rounds. (Keep going and the odds swing back up again:
+on a perfect machine, 6 rounds would reach about 99.98%. But every round adds noise, so the
+first peak is the one worth stopping at.) For a huge number of boxes N it's about 0.8 × √N rounds,
 versus about N/2 checks one by one. With a million boxes that's roughly 800 rounds versus
 500,000 checks.
 
@@ -98,9 +100,14 @@ What that means:
   of the time. Two rounds found it 78.5% of the time, and the prize was the most common
   answer in every run.
 - **The swing effect is real too.** 3 rounds dropped to 27.8%, just as the theory says.
-- **This time the noise comes from the gates, not the reading.** The control read `101`
-  correctly 98% of the time, so misreading costs only about 2 points. But the gap from
-  perfect grows with every round: 1 point at 0 rounds, 8 at 1 round, 16 at 2 rounds.
+- **This time most of the noise comes from the gates, not the reading.** The control read
+  `101` correctly 98% of the time, so misreading on these qubits costs only a couple of points.
+  (Caveat, from ChatGPT's review: the control ran on the same three physical qubits, but the
+  compiler put its 1s on a different pair of them than in the search, so it's a rough guide
+  to these qubits' reading, not an exact match.) The gap from perfect grew through the first
+  two rounds: 1 point at 0 rounds, 8 at 1 round, 16 at 2 rounds. At 3 rounds it was smaller
+  (about 5 points), because the perfect answer there is only 33%, so there's less to lose as
+  noise pulls every answer toward a blind guess.
   Each round adds about 20 two-qubit gates, and each one adds a little error.
   **Lesson 3 couldn't show errors piling up in longer programs. This one does.**
 - **Why that matters:** a search through a million boxes would need about 800 rounds, which
@@ -116,8 +123,8 @@ On the simulator, the script prints `CHECK PASSED` only if:
 - 8 boxes with 2 rounds finds it at least 90% of the time,
 - every round is within 3 percentage points of the perfect number.
 
-On hardware the bar is "the search clearly works": the prize is the most common answer
-for 4 boxes and for 8 boxes at 2 rounds, and 2 rounds beats both 0 rounds and 3 rounds.
+On hardware the bar is "the search clearly works": the prize is the clear top answer (no
+ties) for 4 boxes and for 8 boxes at 2 rounds, and 2 rounds beats 0, 1 and 3 rounds.
 
 ## Run it on a real quantum computer yourself
 
