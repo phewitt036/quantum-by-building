@@ -17,13 +17,14 @@ lesson 1, pre-agreed ordinary coins can fake that, so we also look sideways. Wit
 qubits we have to be careful how we combine the two looks:
 
 - **Quick test (`ghz.py`):** straight + sideways, combined with a standard formula called an
-  *entanglement witness*. It gives a **guaranteed minimum**. Above 50% proves the whole
-  group is linked as one, but it's cautious, so a real link can fall just short.
+  *entanglement witness*. It gives a **guaranteed minimum**. Above 50% by more than two
+  chance wobbles proves the whole group is linked as one, but it's cautious, so a real link
+  can fall just short.
 - **Thorough test (`parity_sweep.py`):** turn every qubit by the same small angle, look
   sideways, and repeat at many angles. A linked group of 16 makes the sideways count wiggle
   **exactly 16 times** per full turn. Only the whole group's all-0s/all-1s link makes that
   fast a wiggle. Groups that aren't fully linked can still make a faint one, so we combine
-  its size with the all-agree share. Above 50% proves the whole-group link.
+  its size with the all-agree share. Proven when its cautious lower bound is above 50%.
 
 New words:
 
@@ -59,12 +60,13 @@ pair, and every qubit's reading.
 
 [`parity_sweep.py`](parity_sweep.py) is the thorough test. Its simulator check includes a
 noisy 8-qubit state whose true link quality can be computed exactly (83.4%). The sweep
-measured 83.1% ± 0.2%.
+measured 83.1%, with a cautious lower bound of 82.6%.
 
 ## What happened when we ran it
 
 All runs on 2026-11-26, 4000 shots per circuit unless noted. Scores are the quick-test
-minimum; "proven" means above 50% by more than 2 chance wobbles.
+minimum; "proven" means above 50% by more than 2 chance wobbles (run 5 uses its own cautious
+lower bound; see below).
 
 ### 1. Let the compiler pick qubits for each size (ibm_fez)
 
@@ -80,8 +82,10 @@ minimum; "proven" means above 50% by more than 2 chance wobbles.
 **Caught in ChatGPT's review:** in this run the compiler placed each straight and sideways
 half separately. For 16, 20 and 28 qubits, the two halves landed on **different physical
 qubits**, so those three scores combine measurements of two different groups and mean nothing.
-That's the likely reason for the odd collapse at 20 (and 24 doing better than 20). We checked
-the saved jobs: at 12 qubits both halves read the same qubits, so the 12-qubit proof stands.
+We checked the saved jobs: at 12 qubits both halves read the same qubits (and avoided qubit 90,
+the bad qubit we find in run 3), so the 12-qubit proof stands. Both 20-qubit halves also used
+qubit 90, while 24 avoided it. That probably explains why 24 beat 20. Either way, 16, 20 and
+28 prove nothing.
 The script now pins each sideways half to its straight half's qubits, and when it reads results
 back it checks the job and marks any mismatched size **NOT VALID**. The chart shows the scores
 as measured; treat 16, 20 and 28 as void.
@@ -119,11 +123,12 @@ bad between calibrations.
 
 ![Run 4](hardware_chain_avoid_results.png)
 
-Back to the run-1 level: **12 proven, 16 just short**, now with nested groups.
+Back to the run-1 level at 12 qubits: **12 proven, and 16 just short**, now with nested groups.
 
 A repeat on **ibm_kingston** (twirling on, sizes 16–24) put 16 qubits at 51.6% ± 1.0%: above
-50%, but not by two wobbles, so **nothing was proven** and that run fails its check. Runs 1, 4
-and this repeat all put 16 qubits right on the edge of what the quick test can prove.
+50%, but not by two wobbles, so **nothing was proven** and that run fails its check. Run 4 and
+this repeat both put 16 qubits right on the edge of what the quick test can prove (run 1's
+16-qubit score is void).
 
 ![Repeat on ibm_kingston](hardware_chain_repeat_results.png)
 
@@ -144,16 +149,16 @@ The dots follow the red 16-times wiggle closely. **All 16 qubits were linked as 
 pick whichever phase matches best, so random noise always produces some wiggle. Our first
 rule ("estimate minus 2 wobbles above 50%") didn't allow for that. In 20,000 simulated runs
 of an *unlinked* state sitting exactly on the 50% line, it said "proven" about 13% of the time.
-The script now uses a cautious lower bound: 2 wobbles off the all-agree share, plus 2 generous
-wobbles off the wiggle size. On the same simulated unlinked states, that falsely proves at
-most about 2% of the time, and it still proves our measured 16-qubit point every time.
+The script now uses a cautious lower bound: 2 wobbles off the all-agree share, and 2 generous
+wobbles off the wiggle size. In the hardest case we simulated (an unlinked state exactly on the 50% line), that falsely
+proves about 2% of the time, and under 1% for the other unlinked states we tried, and it still proves our measured 16-qubit point every time.
 On the real data the bound is 53.4%, so **the 16-qubit result survives the stricter test.**
 
 The sweep's first angle (0°) is exactly the quick test's sideways look, so the same data also
 gives the cautious quick score: **39.9% ± 1.4% for 16 qubits**, nowhere near proving it. On
 identical data, the quick test missed a link the thorough test proved. That suggests fez's
-16-qubit groups in runs 1 and 4 (just under 50% on the quick test) may well have been linked
-too, just not provably that way.
+16-qubit group in run 4 (just under 50% on the quick test) may well have been linked too, just
+not provably that way.
 
 ## What that means
 
@@ -205,7 +210,7 @@ noisy 8-qubit state, where the exact answer can be computed directly, the estima
 
 On hardware, `ghz.py --job` passes only if the smallest group tried is proven linked by the same
 rule used everywhere else (above 50% by more than 2 wobbles, on the same physical qubits), and
-the score falls as the group grows. The chart draws each score with a ±2-wobble error bar; a
+the largest group scores lower than the smallest. The chart draws each score with a ±2-wobble error bar; a
 size counts as proven only if its whole bar is above the 50% line.
 
 ## Run it on a real quantum computer yourself

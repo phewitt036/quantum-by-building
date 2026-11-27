@@ -81,7 +81,7 @@ def quality(counts: list[dict], sizes) -> list[dict]:
         # is too generous: in simulation it called an unlinked state "proven" about 13% of the
         # time. Instead: take 2 wobbles off the all-agree share, and take 2 (generous) wobbles
         # off the wiggle size, using a wobble that ignores how the angles share out the noise.
-        # In simulation this falsely proves an unlinked state at most about 2% of the time.
+        # It falsely proved an unlinked state about 2% of the time in our worst-case simulations.
         sd_a = math.sqrt(a * (1 - a) / shots)
         sd_c = math.sqrt(sum((1 - p * p) / shots for p in parities)) / len(phis)
         lower = (a - 2 * sd_a) / 2 + wiggle - 2 * sd_c
@@ -93,9 +93,17 @@ def quality(counts: list[dict], sizes) -> list[dict]:
 def report(res: list[dict], where: str) -> None:
     print(f"Phase sweep on {where}:")
     for r in res:
+        if not r.get("valid", True):
+            print(f"   {r['n']:2d} qubits: NOT VALID (its circuits read different physical qubits)")
+            continue
         print(f"   {r['n']:2d} qubits: all agree {r['agree']:.1%}, n-times wiggle size {r['wiggle']:.2f}"
               f"  ->  link quality {r['quality']:.1%} (cautious lower bound {r['lower']:.1%})"
-              f"  ({'proven linked' if r['lower'] > 0.5 else 'not proven'})")
+              f"  ({'proven linked' if proven(r) else 'not proven'})")
+
+
+def proven(r: dict) -> bool:
+    """The proof rule: valid (one set of qubits) and cautious lower bound above 50%."""
+    return r.get("valid", True) and r["lower"] > 0.5
 
 
 def save_chart(res: list[dict], where: str, path: Path) -> None:
@@ -110,7 +118,7 @@ def save_chart(res: list[dict], where: str, path: Path) -> None:
         comp = sum(p * cmath.exp(-1j * r["n"] * phi) for p, phi in zip(r["parities"], r["phis"])) / len(r["phis"])
         ax.plot(fine, [2 * abs(comp) * math.cos(r["n"] * math.radians(d) + cmath.phase(comp)) for d in fine],
                 color="#c44e52", linewidth=1, label=f"{r['n']}-times wiggle")
-        verdict = "proven" if r["lower"] > 0.5 else "not proven"
+        verdict = "proven" if proven(r) else ("NOT VALID" if not r.get("valid", True) else "not proven")
         ax.set_title(f"{r['n']} qubits: link quality {r['quality']:.0%} "
                      f"(lower bound {r['lower']:.0%}, {verdict})", fontsize=9)
         ax.set_xlabel("turn angle (degrees)")
@@ -197,15 +205,17 @@ def fetch() -> int:
     sizes = info.get("sizes", SIZES)
     counts = [r.data.c.get_counts() for r in job.result()]
     res = quality(counts, sizes)
-    report(res, info["backend"])
-    # Every circuit for one size must have read the same physical qubits, or the parts don't fit.
+    # Every circuit for one size must have read the same physical qubits, or the parts don't
+    # fit together. Check that first, so the verdict depends on it.
     ran = [item.circuit for item in job.inputs["quantum_program"].items]
     i = 0
-    for n in sizes:
-        block = ran[i:i + 1 + len(angles(n))]
+    for r in res:
+        block = ran[i:i + 1 + len(angles(r["n"]))]
         i += len(block)
-        same = len({frozenset(L.measured_qubits(c)) for c in block}) == 1
-        print(f"   {n} qubits: all {len(block)} circuits read the same physical qubits: {'yes' if same else 'NO - not valid'}")
+        r["valid"] = len({frozenset(L.measured_qubits(c)) for c in block}) == 1
+        print(f"   {r['n']} qubits: all {len(block)} circuits read the same physical qubits: "
+              f"{'yes' if r['valid'] else 'NO'}")
+    report(res, info["backend"])
     # For comparison: ghz.py's cautious quick score from the same data (angle 0 = plain sideways).
     for r in res:
         a, e0 = r["agree"], r["parities"][0]

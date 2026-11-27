@@ -129,7 +129,7 @@ def analyze(counts: list[dict], sizes, label: str, invalid=frozenset()):
     return out, wob
 
 
-def save_chart(series: dict, title: str, path: Path) -> None:
+def save_chart(series: dict, title: str, path: Path, invalid=frozenset()) -> None:
     try:
         import matplotlib.pyplot as plt
     except ImportError:
@@ -139,9 +139,13 @@ def save_chart(series: dict, title: str, path: Path) -> None:
               "plain": ("#4c72b0", "-", "o"), "twirling on": ("#8172b3", "-", "v")}
     for name, (sizes, ys, wobs) in series.items():
         color, ls, marker = styles.get(name, ("#dd8452", "-", "o"))
-        ys = [max(y, 0.0) for y in ys]  # below 0 just means "proves nothing"; show as 0
+        ys = [max(y, 0.0) for y in ys]  # below 0 just means "proves nothing"; drawn at 0
         ax.errorbar(sizes, ys, yerr=[2 * w for w in wobs], color=color, linestyle=ls,
                     marker=marker, capsize=2, label=name)
+        void = [(n, y) for n, y in zip(sizes, ys) if n in invalid]
+        if void:  # sizes whose straight and sideways halves ran on different qubits
+            ax.plot([n for n, _ in void], [y for _, y in void], "x", color="black", markersize=9,
+                    label="void (halves ran on different qubits)" if name == list(series)[0] else None)
     ax.axhline(0.5, color="#c44e52", linewidth=1, linestyle="--",
                label="proven only if the whole error bar is above this line")
     ax.set_xlabel("number of qubits linked together")
@@ -308,8 +312,9 @@ def fetch_jobs() -> int:
             "hardware_chain_results.png" if info.get("chain") else "hardware_results.png")
     if info.get("avoid"):
         how += f", avoiding qubit(s) {info['avoid']}"
+    void = set().union(*(v[2] for v in results.values()))
     save_chart({k: (sizes, v[0], v[1]) for k, v in results.items()},
-               f"Linking many qubits on {info['backend']} ({how})", HERE / name)
+               f"Linking many qubits on {info['backend']} ({how})", HERE / name, void)
 
     def proven_count(v):
         scores, wobs, invalid = v
@@ -319,7 +324,7 @@ def fetch_jobs() -> int:
     ok = (is_proven(scores[0], wobs[0]) and sizes[0] not in invalid  # smallest group proven
           and scores[-1] < scores[0])                                 # bigger groups are harder
     print(f"  need: the smallest group ({sizes[0]} qubits) proven linked (same rule as above), "
-          "and the score falls as the group grows")
+          "and the largest group scores lower than the smallest")
     print("CHECK PASSED" if ok else "CHECK FAILED")
     return 0 if ok else 1
 
