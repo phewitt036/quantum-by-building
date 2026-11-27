@@ -2,3 +2,4 @@ qiskit>=2.6,<3
 qiskit-aer>=0.18
 qiskit-ibm-runtime>=0.52
 matplotlib>=3.9
+numpy>=2  # used directly by lesson 7's false_positive_sim.py

@@ -147,12 +147,21 @@ The dots follow the red 16-times wiggle closely. **All 16 qubits were linked as 
 
 **How sure is "proven"? (fixed after ChatGPT's review)** The wiggle's size is *fitted*: we
 pick whichever phase matches best, so random noise always produces some wiggle. Our first
-rule ("estimate minus 2 wobbles above 50%") didn't allow for that. In 20,000 simulated runs
-of an *unlinked* state sitting exactly on the 50% line, it said "proven" about 13% of the time.
-The script now uses a cautious lower bound: 2 wobbles off the all-agree share, and 2 generous
-wobbles off the wiggle size. In the hardest case we simulated (an unlinked state exactly on the 50% line), that falsely
-proves about 2% of the time, and under 1% for the other unlinked states we tried, and it still proves our measured 16-qubit point every time.
-On the real data the bound is 53.4%, so **the 16-qubit result survives the stricter test.**
+rule ("estimate minus 2 wobbles above 50%") didn't allow for that. The script now uses a
+cautious lower bound instead: 2 wobbles off the all-agree share, and 2 generous wobbles off
+the wiggle size.
+
+[`false_positive_sim.py`](false_positive_sim.py) checks both rules on unlinked 16-qubit states
+sitting exactly on the 50% line (20,000 simulated runs per case, same angles and shots as the
+real sweeps, seed 2026):
+
+```
+hardest case (all agree 100%, no whole-group link):  old rule 13.51%   new rule 1.88%
+three other unlinked states on the line:             old rule 2.2-2.6%  new rule 0.07-0.14%
+```
+
+ChatGPT reproduced the hardest case independently (13.51% → 1.98% with its own seed). The new
+rule still proves our measured 16-qubit point every time. On the real data the bound is 53.4%, so **the 16-qubit result survives the stricter test.**
 
 The sweep's first angle (0°) is exactly the quick test's sideways look, so the same data also
 gives the cautious quick score: **39.9% ± 1.4% for 16 qubits**, nowhere near proving it. On

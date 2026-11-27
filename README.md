@@ -25,6 +25,9 @@ SDK, and every one:
 
 ## Quickstart
 
+Tested with **Python 3.14.3**, Qiskit 2.6.2, qiskit-aer 0.18.4, qiskit-ibm-runtime 0.52.1,
+NumPy 2.5.5 and Matplotlib 3.11.2 (`requirements.txt` allows newer minor versions).
+
 ```bash
 python3 -m venv .venv && source .venv/bin/activate   # Windows Git Bash: source .venv/Scripts/activate
 pip install -r requirements.txt
@@ -59,8 +62,9 @@ The misses taught as much as the successes, so they stay in the write-ups:
   "spin" gates cancel and removed both, so the chip never did the interference being tested.
   The fix (barriers between stages) is now a standing rule for every lesson.
 - **Statistics that were too generous.** Lesson 7's first "proof" rule would have certified an
-  unlinked state about 13% of the time. A fit-aware bound brought that to about 2% in
-  worst-case simulations, and the 16-qubit result still passed.
+  unlinked state 13.5% of the time in the hardest case. A fit-aware bound brought that to 1.9%
+  ([`false_positive_sim.py`](lessons/07_linking_many/false_positive_sim.py), seeded and
+  rerunnable), and the 16-qubit result still passed.
 - **Published calibration can be wrong.** One qubit IBM listed at 0.4% readout error gave the
   wrong answer about 42% of the time. A piece-by-piece diagnostic found it.
 - **Results drift.** A same-qubit repeat of the first 16-qubit run, taken after an overnight

@@ -138,12 +138,14 @@ What that means:
   and by under 1% on another. Real quantum computers have dozens to hundreds of qubits of
   uneven quality that drift over time, and picking good ones is a big part of getting
   good results.
-- **The small leftover error is readout, and the controls prove it.** Spin-spin missed by
+- **The controls suggest the small leftover error is mostly readout.** Spin-spin missed by
   0.2%, and the "set to 0" control was misread 0.1% of the time. Spin-Z-spin missed by 0.6%,
-  and the "set to 1" control was misread 0.4% of the time. The misses match, so almost all
-  the error is the machine misreading the final answer, not the interference going wrong.
-  (A 1 is misread more often because it can relax to 0 while being read.) Errors from gates
-  do pile up in longer programs, but a circuit this short can't show that.
+  and the "set to 1" control was misread 0.4% of the time. The misses are about the size of
+  the plain misreads, which fits most of the error being the machine misreading the final
+  answer rather than the interference going wrong. It's suggestive, not proof: the numbers
+  are tiny, and gate errors this small could hide inside them. (A common reason 1s are
+  misread more often is that a 1 can relax to 0 while being read.) Errors from gates do
+  pile up in longer programs, but a circuit this short can't show that.
 - **How close is "close"?** With 4000 shots, a perfect 50% result still wobbles by about
   ±1.6 percentage points (95% of the time) from chance alone. The 90° and 270° points
   (48.4%, 48.8%) sit at or inside that range.

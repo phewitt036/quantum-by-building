@@ -102,15 +102,15 @@ d6:   {1: 413, 2: 482, 3: 540, 4: 549, 5: 474, 6: 485}  (kept 2943 of 4000)
 
 ![Hardware results](hardware_results.png)
 
-- **This randomness is the real thing.** It comes from physics, not a formula. Run it
-  again and you'd get different rolls that nobody could have predicted.
+- **This randomness comes from a quantum measurement, not a formula.** Run it again and
+  you'd get different rolls; unlike the simulator, there's no seed that reproduces them.
 - **But the die is slightly loaded.** `0` came up 10.3% and `3` came up 13.7%, where a
   fair die gives 12.5%. Is that just bad luck? A standard statistics test (chi-square)
-  says a fair die would look this lopsided only about **1 time in 8,000**. So no: the real
-  qubits lean a little. Most of the lean is in one qubit, which read 1 about 54% of the
-  time instead of 50%. All three leaned slightly toward 1, which is why `000` came up least.
-  Real hardware has small errors both in the "spin" step (the H gate) and in the measuring
-  step, and this test can't tell which one caused it.
+  says a fair die would look this lopsided only about **1 time in 8,000**. So the measured
+  rolls are biased. Most of the lean shows up in one bit, which came out 1 about 54% of the
+  time instead of 50%. All three bits leaned slightly toward 1, which is why `000` came up
+  least. This test measures the bias; it doesn't identify the cause. The "spin" step (the
+  H gate) and the measuring step are both possible sources, and nothing here tells them apart.
 - **So: simulator = even but fake; hardware = real but a bit uneven.** Companies that sell
   quantum random numbers run the raw bits through a mathematical "evener-outer" (called
   *randomness extraction*) that squeezes many slightly loaded bits into fewer, almost

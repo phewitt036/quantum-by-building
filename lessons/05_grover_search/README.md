@@ -100,16 +100,19 @@ What that means:
   of the time. Two rounds found it 78.5% of the time, and the prize was the most common
   answer in every run.
 - **The swing effect is real too.** 3 rounds dropped to 27.8%, just as the theory says.
-- **This time most of the noise comes from the gates, not the reading.** The control read
-  `101` correctly 98% of the time, so misreading on these qubits costs only a couple of points.
+- **The control suggests reading isn't the main source of the gap this time.** The control read
+  `101` correctly 98% of the time, so plain misreading on these qubits looks like only a
+  couple of points.
   (Caveat, from ChatGPT's review: the control ran on the same three physical qubits, but the
   compiler put its 1s on a different pair of them than in the search, so it's a rough guide
   to these qubits' reading, not an exact match.) The gap from perfect grew through the first
   two rounds: 1 point at 0 rounds, 8 at 1 round, 16 at 2 rounds. At 3 rounds it was smaller
   (about 5 points), because the perfect answer there is only 33%, so there's less to lose as
   noise pulls every answer toward a blind guess.
-  Each round adds about 20 two-qubit gates, and each one adds a little error.
-  **Lesson 3 couldn't show errors piling up in longer programs. This one does.**
+  Each round adds about 20 two-qubit gates, so a gap that grows round by round fits errors
+  accumulating gate by gate. This run doesn't separate gate errors from other sources (such as
+  qubits drifting while they wait), so treat that as the likely explanation, not a proven one.
+  **Lesson 3 couldn't show errors piling up in longer programs. This one is consistent with it.**
 - **Why that matters:** a search through a million boxes would need about 800 rounds, which
   means at least tens of thousands of two-qubit gates. Today's chips can't run that many
   before the noise drowns the answer. That's why researchers work on reducing and
