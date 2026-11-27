@@ -86,6 +86,25 @@ What that means:
 different in-between angles and counts how often they agree. It's called a Bell test,
 and it won the 2022 Nobel Prize in Physics. Straight and sideways are enough to see the idea.)
 
+### On a real quantum computer
+
+IBM's **ibm_marrakesh**, 2026-11-26, 1000 runs each (took under a minute, including the queue):
+
+```
+straight: 11: 476   00: 441   10: 53   01: 30    -> coins matched 91.7%
+sideways: 11: 489   00: 475   10: 24   01: 12    -> coins matched 96.4%
+```
+
+![Hardware results](hardware_results.png)
+
+- **Still mostly `00` and `11`, both ways.** The entanglement survived on real hardware, and
+  sideways it was far above the ~50% agreement that pre-arranged coins would give.
+- **But 4–8% mismatches showed up.** The simulator had zero. Real qubits are tiny, fragile
+  physical things: heat, stray signals and imperfect gates knock some runs off course.
+  This is called **noise**, and fighting it is most of what quantum engineering is about
+  today. Lesson 6 digs into it.
+- **Both versions pass** the hardware check (at least 90% matching).
+
 ## How we know it works
 
 The script checks itself and prints `CHECK PASSED` (exit code 0) only if:
@@ -96,7 +115,7 @@ The script checks itself and prints `CHECK PASSED` (exit code 0) only if:
 On real hardware the check relaxes to "at least 90% match", because real qubits are noisy.
 That noise is the subject of lesson 6.
 
-## Try it on a real quantum computer
+## Run it on a real quantum computer yourself
 
 See [HARDWARE.md](../../HARDWARE.md). The short version, once your account is saved:
 
