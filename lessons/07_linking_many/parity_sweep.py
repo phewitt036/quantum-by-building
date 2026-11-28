@@ -167,23 +167,38 @@ def simulate() -> int:
     return 0 if ok else 1
 
 
-def submit(avoid=(), sizes=None, backend_name=None) -> None:
+def submit(avoid=(), sizes=None, backend_name=None, same_as=None) -> None:
     from qiskit.transpiler import generate_preset_pass_manager
     from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
 
     sizes = sizes or SIZES
     service = QiskitRuntimeService()
+    fixed = {}
+    if same_as:
+        # Reuse the exact machine and physical qubits of a published run (data/*.json).
+        old = json.loads(Path(same_as).read_text())
+        backend_name = old["backend"]
+        fixed = {g["qubits_n"]: g["physical_qubits"] for g in old["groups"]}
+        missing = [n for n in sizes if n not in fixed]
+        if missing:
+            raise SystemExit(f"{same_as} has no layout for sizes {missing}")
     backend = (service.backend(backend_name) if backend_name else
                service.least_busy(operational=True, simulator=False, min_num_qubits=max(sizes)))
-    line = L.best_chain(backend, max(sizes), avoid=avoid)
+    line = None if fixed else L.best_chain(backend, max(sizes), avoid=avoid)
     circs = circuits_for(sizes)
     isa = []
     for qc in circs:
         n = qc.num_qubits
-        start = (len(line) - n) // 2
-        pm = generate_preset_pass_manager(backend=backend, optimization_level=2,
-                                          initial_layout=line[start:start + n])
+        if fixed:
+            layout = fixed[n]
+        else:
+            start = (len(line) - n) // 2
+            layout = line[start:start + n]
+        pm = generate_preset_pass_manager(backend=backend, optimization_level=2, initial_layout=layout)
         isa.append(pm.run(qc))
+    if fixed and any(set(L.measured_qubits(c)) != set(fixed[qc.num_qubits]) for qc, c in zip(circs, isa)):
+        raise SystemExit("Some circuits didn't land on the requested qubits; not submitting.")
+    line = line or fixed[max(sizes)]
     sampler = SamplerV2(mode=backend)
     sampler.options.twirling.enable_gates = True
     sampler.options.twirling.enable_measure = True
@@ -238,9 +253,11 @@ def main() -> int:
                         help="with --ibm: physical qubits to leave out (e.g. ones weak_link.py flagged)")
     parser.add_argument("--sizes", type=int, nargs="*", metavar="N", help="with --ibm: group sizes (default 16 20)")
     parser.add_argument("--backend", help="with --ibm: a specific IBM machine (default: least busy)")
+    parser.add_argument("--same-qubits-as", metavar="DATA_JSON",
+                        help="with --ibm: reuse the machine and physical qubits of a published run in data/")
     args = parser.parse_args()
     if args.ibm:
-        submit(args.avoid, args.sizes, args.backend)
+        submit(args.avoid, args.sizes, args.backend, args.same_qubits_as)
         return 0
     if args.job:
         return fetch()

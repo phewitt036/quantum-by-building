@@ -213,6 +213,42 @@ all 35 circuits read the same physical qubits: yes
 **16 qubits proven again**, on a different machine and a different set of qubits, and by a
 wider margin than the first time.
 
+### 8. A third machine (ibm_kingston, 2026-11-28)
+
+With the last of the free IBM time (Patrick's call), the same thorough test ran once more,
+on a third machine. Its 16 qubits were again chosen automatically from that morning's
+calibration, before the run (`parity_sweep.py --ibm --sizes 16 --backend ibm_kingston`;
+35 circuits × 2000 shots, 23 seconds):
+
+```
+all 35 circuits read the same physical qubits: yes
+16 qubits: all agree 72.3%, wiggle size 0.59  ->  link quality 65.7%  (cautious lower bound 64.0%)  PROVEN
+(same data, cautious quick score: 53.5% ± 1.3%)
+```
+
+![Phase sweep on ibm_kingston](parity_kingston_results.png)
+
+**The strongest result so far.** For the first time, even the cautious quick test clears the
+bar for 16 qubits: 53.5%, more than two wobbles above 50%.
+
+### 9. Run 5's exact qubits again, after things settled (ibm_marrakesh, 2026-11-28)
+
+Run 6 (the same-qubit repeat) fell short the morning after a recalibration. About 33 hours
+after run 5, with that day's calibration, we tried run 5's exact 16 qubits once more
+(`parity_sweep.py --ibm --sizes 16 --same-qubits-as data/run5_sweep_marrakesh.json`;
+24 seconds):
+
+```
+all 35 circuits read the same physical qubits: yes (the same 16 as run 5)
+16 qubits: all agree 65.3%, wiggle size 0.49  ->  link quality 57.2%  (cautious lower bound 55.4%)  PROVEN
+```
+
+![Run 5's qubits again, on ibm_marrakesh](parity_marrakesh_retry_results.png)
+
+**The same qubits passed again**, a little above run 5's original 55.2%. So run 6's miss was
+a temporary dip, not a lasting change in those qubits. That fits the drift explanation, but
+three runs on one set of qubits can't establish the cause.
+
 ### Check our numbers yourself
 
 [`data/`](data/) holds what each phase-sweep run measured on real hardware:
@@ -230,11 +266,13 @@ python lessons/07_linking_many/recompute.py
 
 ## What that means
 
-- **Final answer: 16 qubits proven linked as one group, on two different machines.** The
-  thorough test proved it on ibm_marrakesh (cautious lower bound 53.4%) and again the next
-  day on fresh qubits on ibm_fez (57.1%). A repeat on the original marrakesh qubits after an
-  overnight recalibration fell just short (46.9%), and we report that too. The cautious quick
-  test proved 12 in both fez runs that left out the bad qubit (runs 1 and 4).
+- **Final answer: 16 qubits proven linked as one group, on all three machines we could use.**
+  The thorough test passed on ibm_marrakesh (cautious lower bound 53.4%), ibm_fez (57.1%) and
+  ibm_kingston (64.0%). On run 5's original marrakesh qubits it passed in run 5, missed in
+  run 6 (46.9%, the morning after a recalibration), and passed again in run 9 (55.4%): two
+  passes out of three. We report the miss too. The cautious
+  quick test proved 12 in both fez runs that left out the bad qubit (runs 1 and 4), and 16
+  on kingston.
 - **The careful maths mattered as much as the hardware.** The tempting simple formula would
   have claimed 20 on two of the runs. The honest cautious test proved 12, and the better
   measurement, on ibm_marrakesh, proved 16. On a portfolio piece, that's the difference
@@ -298,6 +336,8 @@ python lessons/07_linking_many/ghz.py --ibm --chain --avoid 90   # run 4 (40 s),
 python lessons/07_linking_many/parity_sweep.py --ibm --avoid 90  # run 5 (50 s), then: parity_sweep.py --job
 python lessons/07_linking_many/parity_repeat.py --ibm            # run 6 (45 s), run 5's qubits from data/; then: parity_repeat.py --job
 python lessons/07_linking_many/parity_sweep.py --ibm --sizes 16 --backend ibm_fez  # run 7 (25 s), that day's best fez qubits; then: parity_sweep.py --job
+python lessons/07_linking_many/parity_sweep.py --ibm --sizes 16 --backend ibm_kingston  # run 8 (25 s); then: parity_sweep.py --job
+python lessons/07_linking_many/parity_sweep.py --ibm --sizes 16 --same-qubits-as lessons/07_linking_many/data/run5_sweep_marrakesh.json  # run 9 (25 s); then: parity_sweep.py --job
 ```
 
 Bad qubits change from day to day, so replace `90` with whatever `weak_link.py` flags for
